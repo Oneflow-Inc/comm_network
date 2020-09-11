@@ -1,0 +1,22 @@
+include(ExternalProject)
+set(ZLIB_TAR_URL https://github.com/madler/zlib/archive/v1.2.11.tar.gz)
+set(ZLIB_URL_HASH 0095d2d2d1f3442ce1318336637b695f)
+set(ZLIB_SRC ${THIRD_PARTY_DIR}/zlib)
+
+set(ZLIB_INCLUDE_DIR ${THIRD_PARTY_DIR}/zlib/include)
+set(ZLIB_LIBRARY_DIR ${THIRD_PARTY_DIR}/zlib/lib)
+
+ExternalProject_Add(zlib
+  PREFIX ${ZLIB_SRC}
+  URL ${ZLIB_TAR_URL}
+  URL_HASH MD5=${ZLIB_URL_HASH}
+  UPDATE_COMMAND ""
+  CMAKE_CACHE_ARGS
+      -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
+      -DCMAKE_INSTALL_PREFIX:STRING=${ZLIB_SRC}
+      -DCMAKE_CXX_FLAGS_DEBUG:STRING=${CMAKE_CXX_FLAGS_DEBUG}
+)
+
+set (ZLIB_INCLUDE_DIR ${ZLIB_SRC}/include)
+set (ZLIB_LIBS_DIR ${ZLIB_SRC}/lib)
+set (ZLIB_LIBS ${ZLIB_LIBS_DIR}/libz.a)
