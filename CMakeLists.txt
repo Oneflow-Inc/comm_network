@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 project(comm_network CXX C)
 
 option(WITH_TEST "Build with test" ON)
+option(USE_CLANG_FORMAT "" OFF)
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -13,7 +14,7 @@ list(APPEND CMAKE_MODULE_PATH ${comm_network_cmake_dir})
 
 include (comm_network)
 
-if (USE_TEST)
+if (WITH_TEST)
   enable_testing()
   add_subdirectory(test)
 endif()

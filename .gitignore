@@ -1,2 +1,4 @@
 build/
 third_party/
+tools/__pycache__/
+.vscode/

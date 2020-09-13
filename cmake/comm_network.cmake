@@ -4,33 +4,59 @@ include (openssl)
 include (absl)
 include (cares)
 include (grpc)
+include (proto2cpp)
+include (python)
+
+add_custom_target(formatter
+  COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/run_clang_format.py --clang_format_binary clang-format --source_dir ${CMAKE_CURRENT_SOURCE_DIR}/comm_network --fix --quiet
+)
 
 set (comm_network_third_party_libs
-  ${GRPC_LIBS})
+  ${GRPC_LIBS}
+  ${PROTOBUF_LIBS})
 
 set (comm_network_third_party_includes
-  ${GRPC_INCLUDE_DIR})
+  ${GRPC_INCLUDE_DIR}
+  ${PROTOBUF_INCLUDE_DIR})
 
 # select all the source codes
 file(GLOB_RECURSE comm_network_all_srcs "comm_network/*.*")
 foreach(comm_network_single_file ${comm_network_all_srcs})
   if("${comm_network_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/comm_network/.*\\.cpp$")
-    list(APPEND of_all_obj_cc ${comm_network_single_file})
+    list(APPEND all_obj_cc ${comm_network_single_file})
+  endif()
+  if("${comm_network_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/comm_network/.*\\.proto$")
+    list(APPEND all_proto ${comm_network_single_file})
+    set(group_this ON)
   endif()
   if("${comm_network_single_file}" MATCHES "^${PROJECT_SOURCE_DIR}/comm_network/.*\\.h$")
-    list(APPEND of_all_obj_cc ${comm_network_single_file})
+    list(APPEND all_obj_cc ${comm_network_single_file})
   endif()
 endforeach()
+
+# transfer proto file
+foreach(proto_name ${all_proto})
+  file(RELATIVE_PATH proto_rel_name ${PROJECT_SOURCE_DIR} ${proto_name})
+  list(APPEND all_rel_protos ${proto_rel_name})
+endforeach()
+
+RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
+                               ${PROJECT_SOURCE_DIR}
+                               ${all_rel_protos})
 
 set (third_party_dependencies 
   grpc_create_includes_symlink
   grpc_copy_libs_to_destination
+  protobuf
 )
 
 # compile project code to shared library
 add_custom_target(prepare_third_party ALL DEPENDS ${third_party_dependencies})
-add_library(comm_network SHARED ${of_all_obj_cc})
+add_library(comm_network STATIC ${all_obj_cc} ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(comm_network prepare_third_party)
-target_include_directories(comm_network PUBLIC ${PROJECT_SOURCE_DIR})
+if (USE_CLANG_FORMAT)
+  add_dependencies(comm_network formatter)
+endif()
+target_include_directories(comm_network PUBLIC ${PROJECT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 target_include_directories(comm_network PUBLIC ${comm_network_third_party_includes})
 target_link_libraries(comm_network ${comm_network_third_party_libs})

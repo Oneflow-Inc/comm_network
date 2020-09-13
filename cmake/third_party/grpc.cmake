@@ -61,7 +61,8 @@ ExternalProject_Add(grpc
 )
 
 add_custom_target(grpc_create_includes_symlink
-  COMMAND ln -s ${GRPC_BUILD_DIR}/include ${GRPC_SRC})
+  COMMAND ${CMAKE_COMMAND} -E create_symlink ${GRPC_BUILD_DIR}/include ${GRPC_SRC}/include 
+  DEPENDS grpc)
 
 add_custom_target(grpc_create_library_dir
   COMMAND ${CMAKE_COMMAND} -E make_directory ${GRPC_LIBS_DIR}
