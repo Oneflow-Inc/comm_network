@@ -1,3 +1,4 @@
+include (glog)
 include (zlib)
 include (protobuf)
 include (openssl)
@@ -12,12 +13,35 @@ add_custom_target(formatter
 )
 
 set (comm_network_third_party_libs
+  ${CMAKE_THREAD_LIBS_INIT}
+  ${GLOG_LIBS}
   ${GRPC_LIBS}
   ${PROTOBUF_LIBS})
 
 set (comm_network_third_party_includes
+  ${GLOG_INCLUDE_DIR}
   ${GRPC_INCLUDE_DIR}
   ${PROTOBUF_INCLUDE_DIR})
+
+# rdma supported
+if(UNIX)
+  include(CheckIncludeFiles)
+  include(CheckLibraryExists)
+  CHECK_INCLUDE_FILES(infiniband/verbs.h HAVE_VERBS_H)
+  CHECK_LIBRARY_EXISTS(ibverbs ibv_create_qp "" HAVE_IBVERBS)
+  if(HAVE_VERBS_H AND HAVE_IBVERBS)
+    list(APPEND comm_network_third_party_libs -libverbs)
+    add_definitions(-DWITH_RDMA)
+  elseif(HAVE_VERBS_H)
+    message(FATAL_ERROR "RDMA library not found")
+  elseif(HAVE_IBVERBS)
+    message(FATAL_ERROR "RDMA head file not found")
+  else()
+    message(FATAL_ERROR "RDMA library and head file not found")
+  endif()
+else()
+  message(FATAL_ERROR "UNIMPLEMENTED")
+endif()
 
 # select all the source codes
 file(GLOB_RECURSE comm_network_all_srcs "comm_network/*.*")
@@ -39,15 +63,15 @@ foreach(proto_name ${all_proto})
   file(RELATIVE_PATH proto_rel_name ${PROJECT_SOURCE_DIR} ${proto_name})
   list(APPEND all_rel_protos ${proto_rel_name})
 endforeach()
-
 RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
-                               ${PROJECT_SOURCE_DIR}
-                               ${all_rel_protos})
+  ${PROJECT_SOURCE_DIR}
+  ${all_rel_protos})
 
 set (third_party_dependencies 
   grpc_create_includes_symlink
   grpc_copy_libs_to_destination
   protobuf
+  glog
 )
 
 # compile project code to shared library

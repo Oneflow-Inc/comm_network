@@ -1,21 +1,16 @@
 #pragma once
-#include <mutex>
-#include <thread>
-#include <string>
-#include <unordered_set>
-#include "comm_network/message.h"
+#include "comm_network/ibverbs_memory_desc.h"
 #include "comm_network/env_desc.h"
+#include "comm_network/ibverbs_qp.h"
 
 namespace comm_network {
 class IBVerbsCommNet final {
  public:
-  IBVerbsCommNet(const IBVerbsCommNet&) = delete;
-  IBVerbsCommNet& operator=(const IBVerbsCommNet&) = delete;
-  IBVerbsCommNet(IBVerbsCommNet&&) = delete;
-  IBVerbsCommNet& operator=(IBVerbsCommNet&&) = delete;
+  DISALLOW_COPY_AND_MOVE(IBVerbsCommNet);
   IBVerbsCommNet(EnvDesc& env_desc);
-  ~IBVerbsCommNet();
+  ~IBVerbsCommNet() = default;
 
+  const std::unordered_set<int64_t>& peer_machine_id() { return peer_machine_id_; }
   void* RegisterMemory(void* ptr, size_t byte_size);
   void UnRegisterMemory(void* token);
   void RegisterMemoryDone();
@@ -25,9 +20,12 @@ class IBVerbsCommNet final {
   void ReadDone(void* read_id);
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
 
-  static void set_env_cfg(int64_t id, std::string addr);
-
  private:
   std::unordered_set<int64_t> peer_machine_id_;
+  std::vector<IBVerbsQP*> qp_vec_;
+  ibv_context* context_;
+  ibv_pd* pd_;
+  ibv_cq* cq_;
+  std::thread poll_thread_;
 };
 }  // namespace comm_network

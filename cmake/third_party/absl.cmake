@@ -1,4 +1,5 @@
 include (ExternalProject)
+include(GNUInstallDirs)
 
 SET(ABSL_TAR_URL https://github.com/abseil/abseil-cpp/archive/20200225.2.tar.gz)
 SET(ABSL_URL_HASH 73f2b6e72f1599a9139170c29482ddc4)
