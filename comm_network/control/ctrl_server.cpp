@@ -14,8 +14,6 @@ CtrlServer::CtrlServer() {
   serverBuilder.RegisterService(&ctrl_service);
 	grpc_server_ = serverBuilder.BuildAndStart();
   CHECK(grpc_server_) << "create grpc server failed";
-	LOG(INFO) << "grpc listening on " << server_address;
-  this->grpc_server_->Wait();
   auto grpc_server_run = [this, server_address]() {
     LOG(INFO) << "grpc listening on " << server_address;
     this->grpc_server_->Wait();
