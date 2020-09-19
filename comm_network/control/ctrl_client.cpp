@@ -14,8 +14,7 @@ namespace comm_network {
 			LOG(INFO) << "rpc reply message is okay";
 		}
 		else {
-			LOG(INFO) << "fail";
-			//LOG(INFO) << status.error_code() << ": " << status.error_message();
+			LOG(INFO) << status.error_code() << ": " << status.error_message();
 		}
 	}	
 }

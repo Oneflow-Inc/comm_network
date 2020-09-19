@@ -7,6 +7,7 @@ int main() {
   std::string env_config_file = "/home/liyurui/oneflow-develop/comm_network/test/env_config.in";
   comm_network::EnvDesc env_desc(env_config_file, 0);
   auto machine_cfg = env_desc.machine_cfgs();
+	//comm_network::CtrlServer ctrl_server;
   comm_network::IBVerbsCommNet ibverbs_comm_net(env_desc);
   // // create test array
   // std::vector<int> test_values(10000, 10);

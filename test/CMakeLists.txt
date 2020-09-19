@@ -1,6 +1,7 @@
 # Get all the test files
 SET(TEST_SOURCES
   machine0.cpp
+	machine1.cpp
 )
 
 foreach(test_file ${TEST_SOURCES})

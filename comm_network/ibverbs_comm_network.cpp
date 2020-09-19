@@ -43,11 +43,8 @@ IBVerbsCommNet::IBVerbsCommNet(EnvDesc& env_desc) {
     conn_info.set_interface_id(gid.global.interface_id);
 		// get peer machine ip address
 		std::string target = machine_cfg[peer_id] + ":50051";
-		LOG(INFO) << target;
 		CtrlClient client(grpc::CreateChannel(target, grpc::InsecureChannelCredentials()));
 		client.PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
-		//env_desc.ctrl_client()->PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
-    // Global<CtrlClient>::Get()->PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
   }
   // for (int64_t peer_id : peer_machine_id()) {
   //   IBVerbsConnectionInfo conn_info;
