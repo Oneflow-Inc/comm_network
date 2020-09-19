@@ -1,0 +1,23 @@
+include(ExternalProject)
+include(GNUInstallDirs)
+
+set (GLOG_TAR_URL "https://github.com/google/glog/archive/v0.4.0.tar.gz")
+set (GLOB_URL_HASH "0daea8785e6df922d7887755c3d100d0")
+set (GLOG_SRC ${THIRD_PARTY_DIR}/glog)
+
+ExternalProject_Add(glog
+  PREFIX ${GLOG_SRC}
+  URL ${GLOG_TAR_URL}
+  URL_MD5 ${GLOG_URL_HASH} 
+  CMAKE_CACHE_ARGS
+    -DCMAKE_BUILD_TYPE:STRING=Release
+    -DBUILD_TESTING:BOOL=OFF
+    -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON 
+    -DBUILD_SHARED_LIBS:BOOL=ON
+    -DCMAKE_INSTALL_PREFIX:STRING=${GLOG_SRC}
+)
+
+set (GLOG_INCLUDE_DIR ${GLOG_SRC}/include)
+set (GLOG_LIBS_DIR ${GLOG_SRC}/${CMAKE_INSTALL_LIBDIR})
+set (GLOG_LIBS ${GLOG_LIBS_DIR}/libglog.so)
+
