@@ -2,6 +2,6 @@
 
 namespace comm_network {
 class Msg {
-public:
+ public:
 };
 }  // namespace comm_network

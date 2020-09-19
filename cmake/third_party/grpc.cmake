@@ -35,7 +35,7 @@ ExternalProject_Add(grpc
   URL ${GRPC_TAR_URL}
   URL_HASH MD5=${GRPC_URL_HASH}
   UPDATE_COMMAND ""
-  BUILD_COMMAND make -j${PROC_NUM} grpc grpc_unsecure grpc++_unsecure
+  BUILD_COMMAND make -j${PROC_NUM} grpc grpc_unsecure grpc++_unsecure grpc_cpp_plugin
   INSTALL_COMMAND ""
   BUILD_IN_SOURCE 1
   CMAKE_CACHE_ARGS
@@ -45,7 +45,6 @@ ExternalProject_Add(grpc
     -DCMAKE_C_FLAGS_DEBUG:STRING=${CMAKE_C_FLAGS_DEBUG}
     -DCMAKE_C_FLAGS_RELEASE:STRING=${CMAKE_C_FLAGS_RELEASE}
     -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF
-    -DCMAKE_INSTALL_PREFIX:PATH=${GRPC_SRC}
     -DgRPC_BUILD_TESTS:BOOL=OFF
     -DgRPC_ABSL_PROVIDER:STRING=package
     -Dabsl_DIR:PATH=${ABSL_CONFIG_DIR}
@@ -72,4 +71,9 @@ add_custom_target(grpc_copy_libs_to_destination
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${GRPC_LIBS} ${GRPC_LIBS_DIR}
   DEPENDS grpc_create_library_dir)
 
+add_custom_target(grpc_create_bin_symlink
+  COMMAND ${CMAKE_COMMAND} -E create_symlink ${GRPC_BUILD_DIR}/grpc_cpp_plugin ${GRPC_SRC}/grpc_cpp_plugin
+  DEPENDS grpc)
+
 set (GRPC_INCLUDE_DIR ${GRPC_INCLUDE_DIR})
+set (GRPC_CPP_PLUGIN ${GRPC_SRC}/grpc_cpp_plugin)

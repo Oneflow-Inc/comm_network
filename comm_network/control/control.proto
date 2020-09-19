@@ -1,0 +1,30 @@
+syntax = "proto2";
+package comm_network;
+
+message PushKVRequest {
+  required string key = 1;
+  required bytes val = 2;
+}
+
+message PushKVResponse {
+}
+
+message ClearKVRequest {
+  required string key = 1;
+}
+
+message ClearKVResponse {
+}
+
+message PullKVRequest {
+  required string key = 1;
+}
+
+message PullKVResponse {
+  required bytes val = 1;
+}
+
+service CtrlService {
+  rpc PushKV(PushKVRequest) returns (PushKVResponse) {}
+  rpc PullKV(PullKVRequest) returns (PullKVResponse) {}
+}

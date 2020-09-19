@@ -18,3 +18,7 @@ ExternalProject_Add(cares
     -DCMAKE_BUILD_TYPE:STRING=Release
     -DCMAKE_INSTALL_PREFIX:STRING=${CARES_SRC}
 )
+
+set (CARES_INCLUDE_DIR ${CARES_SRC}/include)
+set (CARES_LIBS_DIR ${CARES_SRC}/lib)
+set (CARES_LIBS ${CARES_LIBS_DIR}/libcares.a )

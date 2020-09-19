@@ -1,3 +1,4 @@
+find_package(Threads)
 include (glog)
 include (zlib)
 include (protobuf)
@@ -14,12 +15,18 @@ add_custom_target(formatter
 
 set (comm_network_third_party_libs
   ${CMAKE_THREAD_LIBS_INIT}
-  ${GLOG_LIBS}
   ${GRPC_LIBS}
+  ${GLOG_LIBS}
+  ${ZLIB_LIBS}
+  ${CARES_LIBS}
+  ${ABSL_LIBS}
   ${PROTOBUF_LIBS})
 
 set (comm_network_third_party_includes
   ${GLOG_INCLUDE_DIR}
+  ${ZLIB_INCLUDE_DIR}
+  ${CARES_INCLUDE_DIR}
+  ${ABSL_INCLUDE_DIR}
   ${GRPC_INCLUDE_DIR}
   ${PROTOBUF_INCLUDE_DIR})
 
@@ -70,6 +77,9 @@ RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
 set (third_party_dependencies 
   grpc_create_includes_symlink
   grpc_copy_libs_to_destination
+  grpc_create_bin_symlink
+  zlib
+  cares
   protobuf
   glog
 )

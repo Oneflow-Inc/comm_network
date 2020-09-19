@@ -39,4 +39,4 @@ IBVerbsMemDescProto IBVerbsMemDesc::ToProto() {
   return proto;
 }
 
-}  // namespace oneflow
+}  // namespace comm_network
