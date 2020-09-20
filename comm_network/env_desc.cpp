@@ -9,6 +9,6 @@ EnvDesc::EnvDesc(std::string config_file, int64_t machine_id) {
   int id;
   std::string ip;
   while (settings >> id >> ip) { machine_cfgs_.emplace(id, ip); }
-	ctrl_server_ = new CtrlServer();
+  ctrl_server_ = new CtrlServer();
 }
 }  // namespace comm_network

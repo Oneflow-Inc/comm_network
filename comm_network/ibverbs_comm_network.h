@@ -7,7 +7,7 @@ namespace comm_network {
 class IBVerbsCommNet final {
  public:
   DISALLOW_COPY_AND_MOVE(IBVerbsCommNet);
-  IBVerbsCommNet(EnvDesc& env_desc);
+  IBVerbsCommNet(const EnvDesc& env_desc);
   ~IBVerbsCommNet() = default;
 
   const std::unordered_set<int64_t>& peer_machine_id() { return peer_machine_id_; }

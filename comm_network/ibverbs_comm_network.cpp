@@ -8,7 +8,7 @@ std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
   return "IBVerbsConnInfo/" + std::to_string(src_machine_id) + "/" + std::to_string(dst_machine_id);
 }
 
-IBVerbsCommNet::IBVerbsCommNet(EnvDesc& env_desc) {
+IBVerbsCommNet::IBVerbsCommNet(const EnvDesc& env_desc) {
   // machine configurations
   auto machine_cfg = env_desc.machine_cfgs();
   int64_t this_machine_id = env_desc.my_machine_id();
@@ -41,11 +41,11 @@ IBVerbsCommNet::IBVerbsCommNet(EnvDesc& env_desc) {
     conn_info.set_qp_num(cur_qp->qp_num());
     conn_info.set_subnet_prefix(gid.global.subnet_prefix);
     conn_info.set_interface_id(gid.global.interface_id);
-		// get peer machine ip address
-		std::string target = machine_cfg[peer_id] + ":50051";
-		LOG(INFO) << target;
-		CtrlClient client(grpc::CreateChannel(target, grpc::InsecureChannelCredentials()));
-		client.PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
+    // get peer machine ip address
+    std::string target = machine_cfg[peer_id] + ":50051";
+    LOG(INFO) << target;
+    CtrlClient client(grpc::CreateChannel(target, grpc::InsecureChannelCredentials()));
+    client.PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
   }
   // for (int64_t peer_id : peer_machine_id()) {
   //   IBVerbsConnectionInfo conn_info;
