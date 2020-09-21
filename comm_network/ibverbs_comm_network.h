@@ -24,6 +24,7 @@ class IBVerbsCommNet final {
  private:
 	void PollCQ();
 
+	static const int32_t max_poll_wc_num_;
   std::unordered_set<int64_t> peer_machine_id_;
   std::vector<IBVerbsQP*> qp_vec_;
   ibv_context* context_;

@@ -158,6 +158,7 @@ void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
 }
 
 void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
+	LOG(INFO) << "In receive done method";
   // Global<ActorMsgBus>::Get()->SendMsgWithoutCommNet(wr_id->msg_mr->msg());
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
