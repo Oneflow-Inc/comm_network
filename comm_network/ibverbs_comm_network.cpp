@@ -8,7 +8,7 @@ std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
   return "IBVerbsConnInfo/" + std::to_string(src_machine_id) + "/" + std::to_string(dst_machine_id);
 }
 
-IBVerbsCommNet::IBVerbsCommNet(const EnvDesc& env_desc) {
+IBVerbsCommNet::IBVerbsCommNet(const EnvDesc& env_desc) : poll_exit_flag_(ATOMIC_FLAG_INIT){
   // machine configurations
   auto machine_cfg = env_desc.machine_cfgs();
   int64_t this_machine_id = env_desc.my_machine_id();
@@ -60,6 +60,17 @@ IBVerbsCommNet::IBVerbsCommNet(const EnvDesc& env_desc) {
 		// ...
   }
   poll_thread_ = std::thread(&IBVerbsCommNet::PollCQ, this);
+}
+
+IBVerbsCommNet::~IBVerbsCommNet() {
+  while (poll_exit_flag_.test_and_set() == true) {}
+  poll_thread_.join();
+  for (IBVerbsQP* qp : qp_vec_) {
+    if (qp) { delete qp; }
+  }
+  CHECK_EQ(ibv_destroy_cq(cq_), 0);
+  CHECK_EQ(ibv_dealloc_pd(pd_), 0);
+  CHECK_EQ(ibv_close_device(context_), 0);
 }
 
 void IBVerbsCommNet::PollCQ() {

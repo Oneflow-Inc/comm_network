@@ -9,7 +9,7 @@ class IBVerbsCommNet final {
  public:
   DISALLOW_COPY_AND_MOVE(IBVerbsCommNet);
   IBVerbsCommNet(const EnvDesc& env_desc);
-  ~IBVerbsCommNet() = default;
+  ~IBVerbsCommNet();
 
   const std::unordered_set<int64_t>& peer_machine_id() { return peer_machine_id_; }
   void* RegisterMemory(void* ptr, size_t byte_size);
@@ -30,5 +30,6 @@ class IBVerbsCommNet final {
   ibv_pd* pd_;
   ibv_cq* cq_;
   std::thread poll_thread_;
+	std::atomic_flag poll_exit_flag_;
 };
 }  // namespace comm_network
