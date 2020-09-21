@@ -14,17 +14,28 @@ CtrlServer::CtrlServer() {
   grpc_server_ = serverBuilder.BuildAndStart();
   CHECK(grpc_server_) << "create grpc server failed";
   LOG(INFO) << "grpc listening on " << server_address;
-	loop_thread_ = std::thread(&CtrlServer::HandleRpcs, this);
+  loop_thread_ = std::thread(&CtrlServer::HandleRpcs, this);
 }
 
 void CtrlServer::HandleRpcs() {
   new CallData(&service_, cq_.get());
+  std::function<void(CallData*)> handler = [this](CallData* call) {
+    const std::string& k = call->request().key();
+    const std::string& v = call->request().val();
+    CHECK(kv_.emplace(k, v).second);
+  };
   void* tag;
   bool ok;
   while (true) {
-                CHECK(cq_->Next(&tag, &ok));
-		CHECK(ok);
-		static_cast<CallData*>(tag)->Proceed();
+    CHECK(cq_->Next(&tag, &ok));
+    CHECK(ok);
+    auto call = static_cast<CallData*>(tag);
+		call->set_request_handler(handler);
+    if (call) {
+      call->Proceed();
+    } else {
+      break;
+    }
   }
 }
 

@@ -47,11 +47,14 @@ IBVerbsCommNet::IBVerbsCommNet(const EnvDesc& env_desc) {
     CtrlClient client(grpc::CreateChannel(target, grpc::InsecureChannelCredentials()));
     client.PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
   }
-  // for (int64_t peer_id : peer_machine_id()) {
-  //   IBVerbsConnectionInfo conn_info;
-  //   // Global<CtrlClient>::Get()->PullKV(GenConnInfoKey(peer_id, this_machine_id), &conn_info);
-  //   qp_vec_.at(peer_id)->Connect(conn_info);
-  // }
+  for (int64_t peer_id : peer_machine_id()) {
+    IBVerbsConnectionInfo conn_info;
+		std::string conn_info_str = env_desc.ctrl_server()->get_kv()[GenConnInfoKey(peer_id, this_machine_id)];
+		conn_info.ParseFromString(conn_info_str);
+		// Global<CtrlClient>::Get()->PullKV(GenConnInfoKey(peer_id, this_machine_id), &conn_info);
+    qp_vec_.at(peer_id)->Connect(conn_info);
+  }
+	sleep(5);
   // // OF_BARRIER();
   // for (int64_t peer_id : peer_machine_id()) {
   //   qp_vec_.at(peer_id)->PostAllRecvRequest();

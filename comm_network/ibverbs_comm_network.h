@@ -2,6 +2,7 @@
 #include "comm_network/ibverbs_memory_desc.h"
 #include "comm_network/env_desc.h"
 #include "comm_network/ibverbs_qp.h"
+#include "comm_network/control/ctrl_client.h"
 
 namespace comm_network {
 class IBVerbsCommNet final {

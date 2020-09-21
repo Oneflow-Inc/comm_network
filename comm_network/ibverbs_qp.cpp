@@ -44,6 +44,7 @@ IBVerbsQP::~IBVerbsQP() {
 }
 
 void IBVerbsQP::Connect(const IBVerbsConnectionInfo& peer_info) {
+	LOG(INFO) << "Connecting";
   ibv_port_attr port_attr;
   CHECK_EQ(ibv_query_port(ctx_, 1, &port_attr), 0);
   ibv_qp_attr qp_attr;
