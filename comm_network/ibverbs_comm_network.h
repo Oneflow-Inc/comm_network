@@ -22,6 +22,8 @@ class IBVerbsCommNet final {
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
 
  private:
+	void PollCQ();
+
   std::unordered_set<int64_t> peer_machine_id_;
   std::vector<IBVerbsQP*> qp_vec_;
   ibv_context* context_;
