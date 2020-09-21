@@ -9,5 +9,5 @@ int main() {
 	comm_network::EnvDesc env_desc(env_config_file, 1);
 	auto machine_cfg = env_desc.machine_cfgs();
 	comm_network::IBVerbsCommNet ibverbs_comm_net(env_desc);
-
+	while (true) {}
 }

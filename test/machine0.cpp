@@ -13,7 +13,7 @@ int main() {
   comm_network::IBVerbsCommNet ibverbs_comm_net(env_desc);
 	comm_network::Msg msg;
 	ibverbs_comm_net.SendMsg(1, msg);
-
+	while (true) {}
   // // create test array
   // std::vector<int> test_values(10000, 10);
   // // init global ibverbs comm_net
