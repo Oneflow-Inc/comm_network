@@ -8,13 +8,13 @@ std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
   return "IBVerbsConnInfo/" + std::to_string(src_machine_id) + "/" + std::to_string(dst_machine_id);
 }
 
-IBVerbsCommNet::IBVerbsCommNet(const EnvDesc& env_desc) : poll_exit_flag_(ATOMIC_FLAG_INIT){
-  // machine configurations
-  auto machine_cfg = env_desc.machine_cfgs();
-  int64_t this_machine_id = env_desc.my_machine_id();
-  for (auto it = machine_cfg.begin(); it != machine_cfg.end(); it++) {
-    if (it->first != this_machine_id) { peer_machine_id_.insert(it->first); }
-  }
+IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id) : poll_exit_flag_(ATOMIC_FLAG_INIT),
+	ctrl_client_(ctrl_client), this_machine_id_(this_machine_id) {
+	int64_t total_machine_num = ctrl_client->env_desc()->TotalMachineNum();
+	for (int64_t i = 0; i < total_machine_num; ++i) {
+    if (i == this_machine_id) { continue; }
+    peer_machine_id_.insert(i);
+  }	
   // prepare qp connections
   ibv_device** device_list = ibv_get_device_list(nullptr);
   PCHECK(device_list);
@@ -41,23 +41,16 @@ IBVerbsCommNet::IBVerbsCommNet(const EnvDesc& env_desc) : poll_exit_flag_(ATOMIC
     conn_info.set_qp_num(cur_qp->qp_num());
     conn_info.set_subnet_prefix(gid.global.subnet_prefix);
     conn_info.set_interface_id(gid.global.interface_id);
-    // get peer machine ip address
-    std::string target = machine_cfg[peer_id] + ":50051";
-    LOG(INFO) << target;
-    CtrlClient client(grpc::CreateChannel(target, grpc::InsecureChannelCredentials()));
-    client.PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
+    ctrl_client->PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
   }
-	sleep(5);
-  for (int64_t peer_id : peer_machine_id()) {
+	for (int64_t peer_id : peer_machine_id()) {
     IBVerbsConnectionInfo conn_info;
-		std::string conn_info_str = env_desc.ctrl_server()->get_kv()[GenConnInfoKey(peer_id, this_machine_id)];
-		conn_info.ParseFromString(conn_info_str);
+    Global<CtrlClient>::Get()->PullKV(GenConnInfoKey(peer_id, this_machine_id), &conn_info);
     qp_vec_.at(peer_id)->Connect(conn_info);
   }
-  for (int64_t peer_id : peer_machine_id()) {
+	for (int64_t peer_id : peer_machine_id()) {
     qp_vec_.at(peer_id)->PostAllRecvRequest();
-		// clear
-		// ...
+    Global<CtrlClient>::Get()->ClearKV(GenConnInfoKey(this_machine_id, peer_id));
   }
   poll_thread_ = std::thread(&IBVerbsCommNet::PollCQ, this);
 }

@@ -1,7 +1,6 @@
 #pragma once
-#include <unordered_map>
-#include <string>
-#include "comm_network/control/ctrl_server.h"
+#include "comm_network/env.pb.h"
+#include "comm_network/utils.h"
 
 namespace comm_network {
 static const size_t kMB = 1024 * 1024;
@@ -9,16 +8,15 @@ static const size_t kMB = 1024 * 1024;
 class EnvDesc {
  public:
   DISALLOW_COPY_AND_MOVE(EnvDesc);
-  EnvDesc() = delete;
+	explicit EnvDesc(const EnvProto& env_proto) : env_proto_(env_proto) {}
   ~EnvDesc() = default;
-  EnvDesc(std::string config_file, int64_t machine_id);
-  std::unordered_map<int64_t, std::string> machine_cfgs() const { return machine_cfgs_; }
-  int64_t my_machine_id() const { return machine_id_; }
-  const CtrlServer* ctrl_server() const { return ctrl_server_; }
+
+	size_t TotalMachineNum() const { return env_proto_.machine().size(); }
+  const Machine& machine(int32_t idx) const { return env_proto_.machine(idx); }
+  int32_t ctrl_port() const { return env_proto_.ctrl_port(); }
+	int64_t GetMachineId(const std::string& addr) const;
 
  private:
-  std::unordered_map<int64_t, std::string> machine_cfgs_;
-  int64_t machine_id_;
-  CtrlServer* ctrl_server_;
+	EnvProto env_proto_;
 };
 }  // namespace comm_network

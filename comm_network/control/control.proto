@@ -1,6 +1,21 @@
 syntax = "proto2";
 package comm_network;
 
+message LoadServerRequest {
+  required string addr = 1;
+}
+
+message LoadServerResponse {
+}
+
+message BarrierRequest {
+  required string name = 1;
+  required int32 num = 2;
+}
+
+message BarrierResponse {
+}
+
 message PushKVRequest {
   required string key = 1;
   required bytes val = 2;
@@ -25,6 +40,8 @@ message PullKVResponse {
 }
 
 service CtrlService {
+	rpc LoadServer(LoadServerRequest) returns (LoadServerResponse) {}
   rpc PushKV(PushKVRequest) returns (PushKVResponse) {}
   rpc PullKV(PullKVRequest) returns (PullKVResponse) {}
+	rpc Barrier(BarrierRequest) returns (BarrierResponse) {}
 }

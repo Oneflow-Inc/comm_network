@@ -1,5 +1,6 @@
 #pragma once
 #include <grpcpp/grpcpp.h>
+#include "comm_network/control/ctrl_call.h"
 #include "comm_network/control/control.grpc.pb.h"
 #include "comm_network/utils.h"
 
@@ -7,51 +8,42 @@ namespace comm_network {
 
 class CtrlServer {
  public:
-  CtrlServer();
+  CtrlServer(int32_t ctrl_port);
   ~CtrlServer();
-  std::unordered_map<std::string, std::string> get_kv() const { return kv_; }
+	const std::string& this_machine_addr() { return this_machine_addr_; }
+//  std::unordered_map<std::string, std::string> get_kv() const { return kv_; }
+
 
  private:
-  class CallData {
-   public:
-    CallData(CtrlService::AsyncService* service, grpc::ServerCompletionQueue* cq)
-        : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE) {
-      Proceed();
-    }
-    const PushKVRequest& request() const { return request_; }
-    void set_request_handler(std::function<void(CallData*)> val) { request_handler_ = val; }
-
-    void Proceed() {
-      if (status_ == CREATE) {
-        status_ = PROCESS;
-        service_->RequestPushKV(&ctx_, &request_, &responder_, cq_, cq_, this);
-      } else if (status_ == PROCESS) {
-        request_handler_(this);
-        auto call = new CallData(service_, cq_);
-        status_ = FINISH;
-        responder_.Finish(response_, grpc::Status::OK, this);
-      } else {
-        CHECK(status_ == FINISH);
-        delete this;
-      }
-    }
-
-   private:
-    CtrlService::AsyncService* service_;
-    grpc::ServerCompletionQueue* cq_;
-    grpc::ServerContext ctx_;
-    PushKVRequest request_;
-    PushKVResponse response_;
-    grpc::ServerAsyncResponseWriter<PushKVResponse> responder_;
-    enum CallStatus { CREATE, PROCESS, FINISH };
-    CallStatus status_;
-    std::function<void(CallData*)> request_handler_;
-  };
   void HandleRpcs();
-  CtrlService::AsyncService service_;
-  std::unique_ptr<grpc::ServerCompletionQueue> cq_;
-  std::thread loop_thread_;
-  std::unique_ptr<grpc::Server> grpc_server_;
+	void LoadServerEnqueueRequest();
+	void PushKVEnqueueRequest();
+	void PullKVEnqueueRequest();
+	void BarrierEnqueueRequest();
+	void Init();
+
+//  	template <CtrlMethod kMethod>
+//  	void EnqueueRequest() {
+//  		constexpr const size_t I = (size_t)kMethod;
+//  	  auto handler = std::get<I>(handlers_);
+//  	  auto call = new CtrlCall<(CtrlMethod)I>();
+//  	  call->set_request_handler(std::bind(handler, call));
+//  		grpc_service_->RequestAsyncUnary(I, call->mut_server_ctx(), call->mut_request(),
+//  	                 call->mut_responder(), cq_.get(), cq_.get(), call);
+//  	}
+
   std::unordered_map<std::string, std::string> kv_;
+	std::unordered_map<std::string, std::list<CtrlCall<CtrlMethod::kPullKV>*>> pending_kv_calls_;
+	std::unordered_map<std::string, std::pair<std::list<CtrlCallIf*>, int32_t>> barrier_calls_;
+	
+	std::tuple<std::function<void(CtrlCall<CtrlMethod::kLoadServer>*)>, 
+		std::function<void(CtrlCall<CtrlMethod::kPushKV>*)>, std::function<void(CtrlCall<CtrlMethod::kPullKV>*)>,
+		std::function<void(CtrlCall<CtrlMethod::kBarrier>*)>> handlers_;
+	std::unique_ptr<CtrlService::AsyncService> grpc_service_;
+  std::unique_ptr<grpc::ServerCompletionQueue> cq_;
+  std::unique_ptr<grpc::Server> grpc_server_;
+  std::thread loop_thread_;
+	bool is_first_connect_;
+  std::string this_machine_addr_;
 };
-}  // namespace comm_network
+}// namespace comm_network

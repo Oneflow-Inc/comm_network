@@ -1,15 +1,20 @@
-#include <fstream>
-#include <string>
 #include "comm_network/env_desc.h"
 
 namespace comm_network {
-EnvDesc::EnvDesc(std::string config_file, int64_t machine_id) {
-  this->machine_id_ = machine_id;
-  std::ifstream settings(config_file);
-  int id;
-  std::string ip;
-  while (settings >> id >> ip) { machine_cfgs_.emplace(id, ip); }
-  ctrl_server_ = new CtrlServer();
-  sleep(5);
+
+int64_t EnvDesc::GetMachineId(const std::string& addr) const {
+  int64_t machine_id = -1;
+  int64_t machine_num = env_proto_.machine_size();
+  FOR_RANGE(int64_t, i, 0, machine_num) {
+    if (addr == env_proto_.machine(i).addr()) {
+      machine_id = i;
+      break;
+    }
+  }
+  CHECK_GE(machine_id, 0);
+  CHECK_LT(machine_id, machine_num);
+  return machine_id;
 }
+
 }  // namespace comm_network
+

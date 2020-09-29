@@ -8,7 +8,7 @@ namespace comm_network {
 class IBVerbsCommNet final {
  public:
   DISALLOW_COPY_AND_MOVE(IBVerbsCommNet);
-  IBVerbsCommNet(const EnvDesc& env_desc);
+  IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id);
   ~IBVerbsCommNet();
 
   const std::unordered_set<int64_t>& peer_machine_id() { return peer_machine_id_; }
@@ -32,5 +32,7 @@ class IBVerbsCommNet final {
   ibv_cq* cq_;
   std::thread poll_thread_;
 	std::atomic_flag poll_exit_flag_;
+	int64_t this_machine_id_;
+	CtrlClient* ctrl_client_;
 };
 }  // namespace comm_network
