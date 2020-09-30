@@ -85,9 +85,7 @@ void CtrlClient::ClearKV(const std::string& k) {
   ClearKVResponse response;
   grpc::ClientContext client_ctx;
   CtrlService::Stub* stub = GetResponsibleStub(k);
-	LOG(INFO) << "In ClearKV";
   grpc::Status st = stub->ClearKV(&client_ctx, request, &response);
-	LOG(INFO) << "After ClearKV";
   if (st.error_code() == grpc::StatusCode::OK) {
     LOG(INFO) << "ClearKV " << k << " Successful.";
   } else {
@@ -101,7 +99,6 @@ void CtrlClient::Barrier(const std::string& barrier_name, int32_t barrier_num) {
   request.set_num(barrier_num);
   BarrierResponse response;
   grpc::ClientContext client_ctx;
-	LOG(INFO) << barrier_name << " " << barrier_num;
   CtrlService::Stub* stub = GetMasterStub();
   grpc::Status st = stub->Barrier(&client_ctx, request, &response);
   if (st.error_code() == grpc::StatusCode::OK) {
