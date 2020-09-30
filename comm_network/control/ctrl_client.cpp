@@ -61,23 +61,49 @@ void CtrlClient::PushKV(const std::string& k, const PbMessage& msg) {
 	} else {
 		LOG(INFO) << "PushKV " << k << " Fail because " << st.error_message();
 	}
+}
 
-  // grpc::ClientContext context;
-	// grpc::CompletionQueue cq;
-  // grpc::Status status;
-	// std::unique_ptr<grpc::ClientAsyncResponseReader<PushKVResponse> > rpc(	
-	// 	stub_->PrepareAsyncPushKV(&context, request, &cq));
-	// rpc->StartCall();
-	// rpc->Finish(&response, &status, (void*)1);
-	// void* got_tag;
-	// bool ok = false;
-	// CHECK(cq.Next(&got_tag, &ok));
-	// CHECK(got_tag == (void*)1);
-	// CHECK(ok);
-  // if (status.ok()) {
-  //   LOG(INFO) << "rpc reply message is okay";
-  // } else {
-  //   LOG(INFO) << status.error_code() << ": " << status.error_message();
-  // }
+void CtrlClient::PullKV(const std::string& k, PbMessage* msg) {
+	PullKVRequest request;
+	request.set_key(k);
+  PullKVResponse response;
+	grpc::ClientContext client_ctx;
+	CtrlService::Stub* stub = GetResponsibleStub(k);
+	grpc::Status st = stub->PullKV(&client_ctx, request, &response); 
+	if (st.error_code() == grpc::StatusCode::OK) {
+		LOG(INFO) << "PullKV " << k << " Successful.";
+	} else {
+		LOG(INFO) << "PullKV " << k << " Fail because " << st.error_message();
+	}
+	msg->ParseFromString(response.val());
+}
+
+void CtrlClient::ClearKV(const std::string& k) {
+	ClearKVRequest request;
+	request.set_key(k);
+  ClearKVResponse response;
+	grpc::ClientContext client_ctx;
+	CtrlService::Stub* stub = GetResponsibleStub(k);
+	grpc::Status st = stub->ClearKV(&client_ctx, request, &response); 
+	if (st.error_code() == grpc::StatusCode::OK) {
+		LOG(INFO) << "ClearKV " << k << " Successful.";
+	} else {
+		LOG(INFO) << "ClearKV " << k << " Fail because " << st.error_message();
+	}
+}
+
+void CtrlClient::Barrier(const std::string& barrier_name, int32_t barrier_num) {
+	BarrierRequest request;
+	request.set_name(barrier_name);
+	request.set_num(barrier_num);
+	BarrierResponse response;
+	grpc::ClientContext client_ctx;
+	CtrlService::Stub* stub = GetMasterStub();
+	grpc::Status st = stub->Barrier(&client_ctx, request, &response); 
+	if (st.error_code() == grpc::StatusCode::OK) {
+		LOG(INFO) << "Barrier  Successful.";
+	} else {
+		LOG(INFO) << "Barrier Fail because " << st.error_message();
+	}
 }
 }  // namespace comm_network

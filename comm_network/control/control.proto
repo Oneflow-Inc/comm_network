@@ -43,5 +43,6 @@ service CtrlService {
 	rpc LoadServer(LoadServerRequest) returns (LoadServerResponse) {}
   rpc PushKV(PushKVRequest) returns (PushKVResponse) {}
   rpc PullKV(PullKVRequest) returns (PullKVResponse) {}
+	rpc ClearKV(ClearKVRequest) returns (ClearKVResponse) {}
 	rpc Barrier(BarrierRequest) returns (BarrierResponse) {}
 }

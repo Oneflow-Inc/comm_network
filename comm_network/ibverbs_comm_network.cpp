@@ -45,14 +45,17 @@ IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id)
   }
 	for (int64_t peer_id : peer_machine_id()) {
     IBVerbsConnectionInfo conn_info;
-    Global<CtrlClient>::Get()->PullKV(GenConnInfoKey(peer_id, this_machine_id), &conn_info);
+    ctrl_client->PullKV(GenConnInfoKey(peer_id, this_machine_id), &conn_info);
     qp_vec_.at(peer_id)->Connect(conn_info);
   }
+	BARRIER(ctrl_client);
 	for (int64_t peer_id : peer_machine_id()) {
     qp_vec_.at(peer_id)->PostAllRecvRequest();
-    Global<CtrlClient>::Get()->ClearKV(GenConnInfoKey(this_machine_id, peer_id));
+    ctrl_client->ClearKV(GenConnInfoKey(this_machine_id, peer_id));
   }
+	BARRIER(ctrl_client);
   poll_thread_ = std::thread(&IBVerbsCommNet::PollCQ, this);
+	BARRIER(ctrl_client);
 }
 
 IBVerbsCommNet::~IBVerbsCommNet() {

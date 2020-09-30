@@ -7,7 +7,7 @@
 namespace comm_network {
 using PbMessage = google::protobuf::Message;
 
-#define FILE_LINE_STR __FILE__ ":" __LINE__
+#define FILE_LINE_STR	"test" 
 
 #define BARRIER_ALL(ctrl_client) ctrl_client->Barrier(FILE_LINE_STR)
 #define BARRIER(ctrl_client)  \
@@ -21,11 +21,15 @@ class CtrlClient {
   //CtrlClient(std::shared_ptr<grpc::Channel> channel) : stub_(CtrlService::NewStub(channel)) {}
   ~CtrlClient() = default;
   void PushKV(const std::string& k, const PbMessage& msg);
+	void PullKV(const std::string& k, PbMessage* msg);
+	void ClearKV(const std::string& k);
+	void Barrier(const std::string& barrier_name, int32_t barrier_num);
 	const EnvDesc* env_desc() const { return env_desc_; }
 
  private:
 	void LoadServer(const std::string& server_addr, CtrlService::Stub* stub);
 	CtrlService::Stub* GetResponsibleStub(const std::string& key);
+	CtrlService::Stub* GetMasterStub() { return stubs_[0].get(); }
   //std::unique_ptr<CtrlService::Stub> stub_;
 	std::vector<std::unique_ptr<CtrlService::Stub>> stubs_;
 	const EnvDesc* env_desc_;
