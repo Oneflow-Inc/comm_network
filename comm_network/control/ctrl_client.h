@@ -7,7 +7,10 @@
 namespace comm_network {
 using PbMessage = google::protobuf::Message;
 
-#define FILE_LINE_STR	"test" 
+#define OF_PP_INTERNAL_STRINGIZE(text) OF_PP_INTERNAL_STRINGIZE_I(text)
+#define OF_PP_INTERNAL_STRINGIZE_I(text) #text
+#define OF_PP_STRINGIZE(x) OF_PP_INTERNAL_STRINGIZE(x)
+#define FILE_LINE_STR	__FILE__ ":" OF_PP_STRINGIZE(__LINE) 
 
 #define BARRIER_ALL(ctrl_client) ctrl_client->Barrier(FILE_LINE_STR)
 #define BARRIER(ctrl_client)  \

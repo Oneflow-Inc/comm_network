@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
 	std::string ip_confs_raw_array[2] = {"192.168.1.12", "192.168.1.13"};
 	//std::string ip_confs_raw_array[1] = {"192.168.1.12"};
 	int32_t ctrl_port = 10534;
-	std::vector<std::string> ip_confs(ip_confs_raw_array, ip_confs_raw_array + 1);
+	std::vector<std::string> ip_confs(ip_confs_raw_array, ip_confs_raw_array + 2);
 	EnvProto env_proto = InitEnvProto(ip_confs, ctrl_port);
 	EnvDesc* env_desc = new EnvDesc(env_proto);
 	CtrlServer* ctrl_server = new CtrlServer(ctrl_port);
