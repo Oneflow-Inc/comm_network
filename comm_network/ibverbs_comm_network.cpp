@@ -8,13 +8,15 @@ std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
   return "IBVerbsConnInfo/" + std::to_string(src_machine_id) + "/" + std::to_string(dst_machine_id);
 }
 
-IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id) : poll_exit_flag_(ATOMIC_FLAG_INIT),
-	ctrl_client_(ctrl_client), this_machine_id_(this_machine_id) {
-	int64_t total_machine_num = ctrl_client->env_desc()->TotalMachineNum();
-	for (int64_t i = 0; i < total_machine_num; ++i) {
+IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id)
+    : poll_exit_flag_(ATOMIC_FLAG_INIT),
+      ctrl_client_(ctrl_client),
+      this_machine_id_(this_machine_id) {
+  int64_t total_machine_num = ctrl_client->env_desc()->TotalMachineNum();
+  for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id) { continue; }
     peer_machine_id_.insert(i);
-  }	
+  }
   // prepare qp connections
   ibv_device** device_list = ibv_get_device_list(nullptr);
   PCHECK(device_list);
@@ -43,19 +45,19 @@ IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id)
     conn_info.set_interface_id(gid.global.interface_id);
     ctrl_client->PushKV(GenConnInfoKey(this_machine_id, peer_id), conn_info);
   }
-	for (int64_t peer_id : peer_machine_id()) {
+  for (int64_t peer_id : peer_machine_id()) {
     IBVerbsConnectionInfo conn_info;
     ctrl_client->PullKV(GenConnInfoKey(peer_id, this_machine_id), &conn_info);
     qp_vec_.at(peer_id)->Connect(conn_info);
   }
-	BARRIER(ctrl_client);
-	for (int64_t peer_id : peer_machine_id()) {
+  BARRIER(ctrl_client);
+  for (int64_t peer_id : peer_machine_id()) {
     qp_vec_.at(peer_id)->PostAllRecvRequest();
     ctrl_client->ClearKV(GenConnInfoKey(this_machine_id, peer_id));
   }
-	BARRIER(ctrl_client);
+  BARRIER(ctrl_client);
   poll_thread_ = std::thread(&IBVerbsCommNet::PollCQ, this);
-	BARRIER(ctrl_client);
+  BARRIER(ctrl_client);
 }
 
 IBVerbsCommNet::~IBVerbsCommNet() {
@@ -93,13 +95,13 @@ void IBVerbsCommNet::PollCQ() {
           qp->RecvDone(wr_id);
           break;
         }
-				default: {
-					LOG(FATAL) << "UNIMPLEMENTED";
-					break;
-				} 
+        default: {
+          LOG(FATAL) << "UNIMPLEMENTED";
+          break;
+        }
       }
     }
-  }	
+  }
 }
 
 void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, const Msg& msg) {

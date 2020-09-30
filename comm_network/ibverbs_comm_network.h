@@ -22,17 +22,17 @@ class IBVerbsCommNet final {
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
 
  private:
-	void PollCQ();
+  void PollCQ();
 
-	static const int32_t max_poll_wc_num_;
+  static const int32_t max_poll_wc_num_;
   std::unordered_set<int64_t> peer_machine_id_;
   std::vector<IBVerbsQP*> qp_vec_;
   ibv_context* context_;
   ibv_pd* pd_;
   ibv_cq* cq_;
   std::thread poll_thread_;
-	std::atomic_flag poll_exit_flag_;
-	int64_t this_machine_id_;
-	CtrlClient* ctrl_client_;
+  std::atomic_flag poll_exit_flag_;
+  int64_t this_machine_id_;
+  CtrlClient* ctrl_client_;
 };
 }  // namespace comm_network

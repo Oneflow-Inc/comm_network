@@ -8,15 +8,15 @@ static const size_t kMB = 1024 * 1024;
 class EnvDesc {
  public:
   DISALLOW_COPY_AND_MOVE(EnvDesc);
-	explicit EnvDesc(const EnvProto& env_proto) : env_proto_(env_proto) {}
+  explicit EnvDesc(const EnvProto& env_proto) : env_proto_(env_proto) {}
   ~EnvDesc() = default;
 
-	size_t TotalMachineNum() const { return env_proto_.machine().size(); }
+  size_t TotalMachineNum() const { return env_proto_.machine().size(); }
   const Machine& machine(int32_t idx) const { return env_proto_.machine(idx); }
   int32_t ctrl_port() const { return env_proto_.ctrl_port(); }
-	int64_t GetMachineId(const std::string& addr) const;
+  int64_t GetMachineId(const std::string& addr) const;
 
  private:
-	EnvProto env_proto_;
+  EnvProto env_proto_;
 };
 }  // namespace comm_network

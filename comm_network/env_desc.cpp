@@ -17,4 +17,3 @@ int64_t EnvDesc::GetMachineId(const std::string& addr) const {
 }
 
 }  // namespace comm_network
-

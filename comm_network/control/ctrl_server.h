@@ -10,40 +10,41 @@ class CtrlServer {
  public:
   CtrlServer(int32_t ctrl_port);
   ~CtrlServer();
-	const std::string& this_machine_addr() { return this_machine_addr_; }
-//  std::unordered_map<std::string, std::string> get_kv() const { return kv_; }
-
+  const std::string& this_machine_addr() { return this_machine_addr_; }
+  //  std::unordered_map<std::string, std::string> get_kv() const { return kv_; }
 
  private:
   void HandleRpcs();
-	void LoadServerEnqueueRequest();
-	void PushKVEnqueueRequest();
-	void PullKVEnqueueRequest();
-	void BarrierEnqueueRequest();
-	void Init();
+  void LoadServerEnqueueRequest();
+  void PushKVEnqueueRequest();
+  void PullKVEnqueueRequest();
+  void BarrierEnqueueRequest();
+  void Init();
 
-//  	template <CtrlMethod kMethod>
-//  	void EnqueueRequest() {
-//  		constexpr const size_t I = (size_t)kMethod;
-//  	  auto handler = std::get<I>(handlers_);
-//  	  auto call = new CtrlCall<(CtrlMethod)I>();
-//  	  call->set_request_handler(std::bind(handler, call));
-//  		grpc_service_->RequestAsyncUnary(I, call->mut_server_ctx(), call->mut_request(),
-//  	                 call->mut_responder(), cq_.get(), cq_.get(), call);
-//  	}
+  //  	template <CtrlMethod kMethod>
+  //  	void EnqueueRequest() {
+  //  		constexpr const size_t I = (size_t)kMethod;
+  //  	  auto handler = std::get<I>(handlers_);
+  //  	  auto call = new CtrlCall<(CtrlMethod)I>();
+  //  	  call->set_request_handler(std::bind(handler, call));
+  //  		grpc_service_->RequestAsyncUnary(I, call->mut_server_ctx(), call->mut_request(),
+  //  	                 call->mut_responder(), cq_.get(), cq_.get(), call);
+  //  	}
 
   std::unordered_map<std::string, std::string> kv_;
-	std::unordered_map<std::string, std::list<CtrlCall<CtrlMethod::kPullKV>*>> pending_kv_calls_;
-	std::unordered_map<std::string, std::pair<std::list<CtrlCallIf*>, int32_t>> barrier_calls_;
-	
-	std::tuple<std::function<void(CtrlCall<CtrlMethod::kLoadServer>*)>, 
-		std::function<void(CtrlCall<CtrlMethod::kPushKV>*)>, std::function<void(CtrlCall<CtrlMethod::kPullKV>*)>,
-		std::function<void(CtrlCall<CtrlMethod::kBarrier>*)>> handlers_;
-	std::unique_ptr<CtrlService::AsyncService> grpc_service_;
+  std::unordered_map<std::string, std::list<CtrlCall<CtrlMethod::kPullKV>*>> pending_kv_calls_;
+  std::unordered_map<std::string, std::pair<std::list<CtrlCallIf*>, int32_t>> barrier_calls_;
+
+  std::tuple<std::function<void(CtrlCall<CtrlMethod::kLoadServer>*)>,
+             std::function<void(CtrlCall<CtrlMethod::kPushKV>*)>,
+             std::function<void(CtrlCall<CtrlMethod::kPullKV>*)>,
+             std::function<void(CtrlCall<CtrlMethod::kBarrier>*)>>
+      handlers_;
+  std::unique_ptr<CtrlService::AsyncService> grpc_service_;
   std::unique_ptr<grpc::ServerCompletionQueue> cq_;
   std::unique_ptr<grpc::Server> grpc_server_;
   std::thread loop_thread_;
-	bool is_first_connect_;
+  bool is_first_connect_;
   std::string this_machine_addr_;
 };
-}// namespace comm_network
+}  // namespace comm_network

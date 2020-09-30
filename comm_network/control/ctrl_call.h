@@ -7,18 +7,21 @@ namespace comm_network {
 
 class CtrlCallIf {
  public:
-	DISALLOW_COPY_AND_MOVE(CtrlCallIf);
-	virtual ~CtrlCallIf() = default;
+  DISALLOW_COPY_AND_MOVE(CtrlCallIf);
+  virtual ~CtrlCallIf() = default;
 
-	virtual void Process() = 0;
+  virtual void Process() = 0;
   virtual void SendResponse() = 0;
+
  protected:
   CtrlCallIf() = default;
 };
 
-enum class CtrlMethod { kLoadServer, kPushKV, kPullKV, kBarrier};
-using CtrlRequestTuple = std::tuple<LoadServerRequest, PushKVRequest, PullKVRequest, BarrierRequest>;
-using CtrlResponseTuple = std::tuple<LoadServerResponse, PushKVResponse, PullKVResponse, BarrierResponse>;
+enum class CtrlMethod { kLoadServer, kPushKV, kPullKV, kBarrier };
+using CtrlRequestTuple =
+    std::tuple<LoadServerRequest, PushKVRequest, PullKVRequest, BarrierRequest>;
+using CtrlResponseTuple =
+    std::tuple<LoadServerResponse, PushKVResponse, PullKVResponse, BarrierResponse>;
 
 template<CtrlMethod ctrl_method>
 using CtrlRequest =
@@ -28,14 +31,14 @@ template<CtrlMethod ctrl_method>
 using CtrlResponse =
     typename std::tuple_element<static_cast<size_t>(ctrl_method), CtrlResponseTuple>::type;
 
-template <CtrlMethod ctrl_method>
+template<CtrlMethod ctrl_method>
 class CtrlCall final : public CtrlCallIf {
  public:
-	DISALLOW_COPY_AND_MOVE(CtrlCall);
-	CtrlCall() : status_(Status::kBeforeHandleRequest), responder_(&server_ctx_) {}
+  DISALLOW_COPY_AND_MOVE(CtrlCall);
+  CtrlCall() : status_(Status::kBeforeHandleRequest), responder_(&server_ctx_) {}
   ~CtrlCall() = default;
 
-	const CtrlRequest<ctrl_method>& request() const { return request_; }
+  const CtrlRequest<ctrl_method>& request() const { return request_; }
   CtrlRequest<ctrl_method>* mut_request() { return &request_; }
   CtrlResponse<ctrl_method>* mut_response() { return &response_; }
   grpc::ServerContext* mut_server_ctx() { return &server_ctx_; }
@@ -43,7 +46,7 @@ class CtrlCall final : public CtrlCallIf {
     return &responder_;
   }
   void set_request_handler(std::function<void()> val) { request_handler_ = val; }
-	void Process() override {
+  void Process() override {
     switch (status_) {
       case Status::kBeforeHandleRequest: {
         request_handler_();
@@ -62,13 +65,12 @@ class CtrlCall final : public CtrlCallIf {
   }
 
  private:
-	enum class Status { kBeforeHandleRequest, kBeforeDelete };
-	Status status_;
-	CtrlRequest<ctrl_method> request_;
-	CtrlResponse<ctrl_method> response_;
-	grpc::ServerContext server_ctx_;
+  enum class Status { kBeforeHandleRequest, kBeforeDelete };
+  Status status_;
+  CtrlRequest<ctrl_method> request_;
+  CtrlResponse<ctrl_method> response_;
+  grpc::ServerContext server_ctx_;
   grpc::ServerAsyncResponseWriter<CtrlResponse<ctrl_method>> responder_;
-  std::function<void()> request_handler_;	
+  std::function<void()> request_handler_;
 };
-}
-
+}  // namespace comm_network
