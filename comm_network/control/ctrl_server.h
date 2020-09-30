@@ -11,7 +11,6 @@ class CtrlServer {
   CtrlServer(int32_t ctrl_port);
   ~CtrlServer();
   const std::string& this_machine_addr() { return this_machine_addr_; }
-  //  std::unordered_map<std::string, std::string> get_kv() const { return kv_; }
 
  private:
   void HandleRpcs();
@@ -19,6 +18,7 @@ class CtrlServer {
   void PushKVEnqueueRequest();
   void PullKVEnqueueRequest();
   void BarrierEnqueueRequest();
+	void ClearKVEnqueueRequest();
   void Init();
 
   //  	template <CtrlMethod kMethod>
@@ -38,7 +38,8 @@ class CtrlServer {
   std::tuple<std::function<void(CtrlCall<CtrlMethod::kLoadServer>*)>,
              std::function<void(CtrlCall<CtrlMethod::kPushKV>*)>,
              std::function<void(CtrlCall<CtrlMethod::kPullKV>*)>,
-             std::function<void(CtrlCall<CtrlMethod::kBarrier>*)>>
+             std::function<void(CtrlCall<CtrlMethod::kBarrier>*)>,
+						 std::function<void(CtrlCall<CtrlMethod::kClearKV>*)>>
       handlers_;
   std::unique_ptr<CtrlService::AsyncService> grpc_service_;
   std::unique_ptr<grpc::ServerCompletionQueue> cq_;

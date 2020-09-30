@@ -17,11 +17,11 @@ class CtrlCallIf {
   CtrlCallIf() = default;
 };
 
-enum class CtrlMethod { kLoadServer, kPushKV, kPullKV, kBarrier };
+enum class CtrlMethod { kLoadServer, kPushKV, kPullKV, kBarrier, kClearKV };
 using CtrlRequestTuple =
-    std::tuple<LoadServerRequest, PushKVRequest, PullKVRequest, BarrierRequest>;
+    std::tuple<LoadServerRequest, PushKVRequest, PullKVRequest, BarrierRequest, ClearKVRequest>;
 using CtrlResponseTuple =
-    std::tuple<LoadServerResponse, PushKVResponse, PullKVResponse, BarrierResponse>;
+    std::tuple<LoadServerResponse, PushKVResponse, PullKVResponse, BarrierResponse, ClearKVResponse>;
 
 template<CtrlMethod ctrl_method>
 using CtrlRequest =

@@ -24,6 +24,7 @@ void CtrlServer::HandleRpcs() {
   PushKVEnqueueRequest();
   PullKVEnqueueRequest();
   BarrierEnqueueRequest();
+	ClearKVEnqueueRequest();
 
   void* tag = nullptr;
   bool ok = false;
@@ -81,6 +82,14 @@ void CtrlServer::BarrierEnqueueRequest() {
   auto call = new CtrlCall<CtrlMethod::kBarrier>();
   call->set_request_handler(std::bind(handler, call));
   grpc_service_->RequestBarrier(call->mut_server_ctx(), call->mut_request(), call->mut_responder(),
+                                cq_.get(), cq_.get(), call);
+}
+
+void CtrlServer::ClearKVEnqueueRequest() {
+  auto handler = std::get<4>(handlers_);
+  auto call = new CtrlCall<CtrlMethod::kClearKV>();
+  call->set_request_handler(std::bind(handler, call));
+  grpc_service_->RequestClearKV(call->mut_server_ctx(), call->mut_request(), call->mut_responder(),
                                 cq_.get(), cq_.get(), call);
 }
 
@@ -151,6 +160,16 @@ void CtrlServer::Init() {
     // EnqueueRequest<CtrlMethod::kBarrier>();
   });
   std::get<3>(handlers_) = bind_barrier_func;
+
+	const auto& bind_clearkv_func =	([this](CtrlCall<CtrlMethod::kClearKV>* call) {
+    const std::string& k = call->request().key();
+    CHECK_EQ(kv_.erase(k), 1);
+    CHECK(pending_kv_calls_.find(k) == pending_kv_calls_.end());
+    call->SendResponse();
+		ClearKVEnqueueRequest();
+    //EnqueueRequest<CtrlMethod::kClearKV>();
+  });	
+	std::get<4>(handlers_) = bind_clearkv_func;
 }
 
 }  // namespace comm_network

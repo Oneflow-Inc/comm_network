@@ -52,8 +52,10 @@ IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id)
   }
   BARRIER(ctrl_client);
   for (int64_t peer_id : peer_machine_id()) {
+		LOG(INFO) << peer_id;
     qp_vec_.at(peer_id)->PostAllRecvRequest();
     ctrl_client->ClearKV(GenConnInfoKey(this_machine_id, peer_id));
+		LOG(INFO) << "Here";
   }
   BARRIER(ctrl_client);
   poll_thread_ = std::thread(&IBVerbsCommNet::PollCQ, this);
