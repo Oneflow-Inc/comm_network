@@ -18,6 +18,7 @@ IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, MsgBus* msg_bus, int64_t
       this_machine_id_(this_machine_id),
 			msg_bus_(msg_bus) {
   int64_t total_machine_num = ctrl_client->env_desc()->TotalMachineNum();
+	token2mem_desc_.resize(total_machine_num);
   for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id) { continue; }
     peer_machine_id_.insert(i);
