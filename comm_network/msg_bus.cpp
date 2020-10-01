@@ -5,6 +5,10 @@ MsgBus::MsgBus() {
 	msg_handler_ = std::thread(&MsgBus::HandleMsg, this);
 }
 
+MsgBus::~MsgBus() {
+	CHECK(msg_buffer_.empty());
+}
+
 void MsgBus::AddNewMsg(const Msg& msg) {
 	msg_buffer_.push(msg);		
 }
