@@ -11,6 +11,7 @@ class MsgBus {
 	void HandleMsg();
  
  private:
+	bool exit_flag_;
 	std::queue<Msg> msg_buffer_;
 	std::thread msg_handler_;
 };
