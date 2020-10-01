@@ -5,14 +5,13 @@
 namespace comm_network {
 class MsgBus {
  public:
-	MsgBus();
+	MsgBus() = default;
 	~MsgBus();
 	void AddNewMsg(const Msg& msg);
-	void HandleMsg();
+	Msg GetAndRemoveTopRecvMsg();
+	bool is_empty() { return msg_buffer_.empty(); }
  
  private:
-	bool exit_flag_;
 	std::queue<Msg> msg_buffer_;
-	std::thread msg_handler_;
 };
 }

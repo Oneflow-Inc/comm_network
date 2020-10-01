@@ -21,10 +21,10 @@ EnvProto InitEnvProto(const std::vector<std::string>& ip_confs, int32_t ctrl_por
 	return env_proto;
 }
 
-void HandleMachineProcess(int64_t this_machine_id, IBVerbsCommNet* ibverbs_comm_net) {
+void HandleMachineProcess(int64_t this_machine_id, IBVerbsCommNet* ibverbs_comm_net, MsgBus* msg_bus) {
 	switch(this_machine_id) {
 		case 0: {
-			std::cout << "Machine 0: " << std::endl;
+			std::cout << "In Machine 0 Handle Procedure: " << std::endl;
 			int test_data_arr[100];
 			for (int i = 0;i < 100;i++) {
 				test_data_arr[i] = i;
@@ -34,7 +34,10 @@ void HandleMachineProcess(int64_t this_machine_id, IBVerbsCommNet* ibverbs_comm_
 			break;
 		}
 		case 1: {
-			std::cout << "Machine 1: " << std::endl;
+			std::cout << "In Machine 1 Handle Procedure: " << std::endl;
+			while (!msg_bus->is_empty()) {}
+			Msg msg = msg_bus->GetAndRemoveTopRecvMsg();
+			std::cout << msg.src_id() << " " << msg.dst_id() << std::endl;
 			break;
 		}
 		default:
@@ -56,7 +59,7 @@ int main(int argc, char* argv[]) {
 	int64_t this_machine_id = env_desc->GetMachineId(ctrl_server->this_machine_addr());
 	std::cout << "This machine id is: " << this_machine_id << std::endl;
 	IBVerbsCommNet ibverbs_comm_net(ctrl_client, msg_bus, this_machine_id);
-	HandleMachineProcess(this_machine_id, &ibverbs_comm_net);
+	HandleMachineProcess(this_machine_id, &ibverbs_comm_net, msg_bus);
 	
 	delete env_desc;
 	delete ctrl_server;
