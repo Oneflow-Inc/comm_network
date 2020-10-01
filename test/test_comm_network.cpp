@@ -24,7 +24,11 @@ void HandleMachineProcess(int64_t this_machine_id, IBVerbsCommNet* ibverbs_comm_
 	switch(this_machine_id) {
 		case 0: {
 			std::cout << "Machine 0: " << std::endl;
-			Msg msg;
+			int test_data_arr[100];
+			for (int i = 0;i < 100;i++) {
+				test_data_arr[i] = i;
+			}
+			Msg msg(0, 1, test_data_arr, 100 * sizeof(int));
 			ibverbs_comm_net->SendMsg(1, msg);	
 			break;
 		}
