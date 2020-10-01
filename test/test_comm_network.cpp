@@ -29,15 +29,17 @@ void HandleMachineProcess(int64_t this_machine_id, IBVerbsCommNet* ibverbs_comm_
 			for (int i = 0;i < 100;i++) {
 				test_data_arr[i] = i;
 			}
-			Msg msg(0, 1, test_data_arr, 100 * sizeof(int));
+			Msg msg(0, 1, test_data_arr, 100 * sizeof(int), MsgType::DataIsReady);
 			ibverbs_comm_net->SendMsg(1, msg);	
 			break;
 		}
 		case 1: {
 			std::cout << "In Machine 1 Handle Procedure: " << std::endl;
-			while (!msg_bus->is_empty()) {}
+			while (msg_bus->is_empty()) {}
 			Msg msg = msg_bus->GetAndRemoveTopRecvMsg();
-			std::cout << msg.src_id() << " " << msg.dst_id() << std::endl;
+			size_t data_arr_size = msg.data_size();
+			void* data = malloc(data_arr_size);
+			//ibverbs_comm_net->Read(msg.src_id(), msg.src_addr(), data, data_arr_size);
 			break;
 		}
 		default:
@@ -59,13 +61,22 @@ int main(int argc, char* argv[]) {
 	int64_t this_machine_id = env_desc->GetMachineId(ctrl_server->this_machine_addr());
 	std::cout << "This machine id is: " << this_machine_id << std::endl;
 	IBVerbsCommNet ibverbs_comm_net(ctrl_client, msg_bus, this_machine_id);
+	int num_of_register_buffer = 2;
+	size_t buffer_size = 4 * 1024 * 1024;
+	for (int i = 0;i < num_of_register_buffer;i++) {
+		void* buffer = malloc(buffer_size);
+		ibverbs_comm_net.RegisterMemory(buffer, buffer_size);
+	}
+	ibverbs_comm_net.RegisterMemoryDone();
 	HandleMachineProcess(this_machine_id, &ibverbs_comm_net, msg_bus);
 	
 	delete env_desc;
 	delete ctrl_server;
 	delete ctrl_client;
 	delete msg_bus;
-
+	for (IBVerbsMemDesc* mem_desc : ibverbs_comm_net.mem_desc()) {
+		ibverbs_comm_net.UnRegisterMemory(mem_desc);
+	}
 	return 0;
 }
 

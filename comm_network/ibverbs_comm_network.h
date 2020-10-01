@@ -16,8 +16,10 @@ class IBVerbsCommNet final {
   void* RegisterMemory(void* ptr, size_t byte_size);
   void UnRegisterMemory(void* token);
   void RegisterMemoryDone();
-
-  void Read(void* read_id, int64_t src_machine_id, void* src_token, void* dst_token);
+	const std::unordered_set<IBVerbsMemDesc*>& mem_desc() { return mem_desc_; }
+	
+  //void Read(void* read_id, int64_t src_machine_id, void* src_token, void* dst_token);
+	void Read(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size);
   void AddReadCallBack(void* read_id, std::function<void()> callback);
   void ReadDone(void* read_id);
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
@@ -36,5 +38,8 @@ class IBVerbsCommNet final {
   int64_t this_machine_id_;
   CtrlClient* ctrl_client_;
 	MsgBus* msg_bus_;
+	std::mutex mem_desc_mtx_;
+	std::unordered_set<IBVerbsMemDesc*> mem_desc_;
+	std::vector<std::unordered_map<void*, IBVerbsMemDescProto>> token2mem_desc_;
 };
 }  // namespace comm_network
