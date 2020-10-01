@@ -156,10 +156,9 @@ void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
   DeleteWorkRequestId(wr_id);
 }
 
-void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
-  LOG(INFO) << wr_id->msg_mr->msg().src_id();
-  LOG(INFO) << wr_id->msg_mr->msg().dst_id();
+void IBVerbsQP::RecvDone(WorkRequestId* wr_id, MsgBus* msg_bus) {
   // Global<ActorMsgBus>::Get()->SendMsgWithoutCommNet(wr_id->msg_mr->msg());
+	msg_bus->AddNewMsg(wr_id->msg_mr->msg());
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }

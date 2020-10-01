@@ -5,6 +5,7 @@
 #include "comm_network/control/ctrl_client.h"
 #include "comm_network/ibverbs_comm_network.h"
 #include "comm_network/message.h"
+#include "comm_network/msg_bus.h"
 
 using namespace comm_network;
 
@@ -50,16 +51,17 @@ int main(int argc, char* argv[]) {
 	EnvDesc* env_desc = new EnvDesc(env_proto);
 	CtrlServer* ctrl_server = new CtrlServer(ctrl_port);
 	CtrlClient* ctrl_client = new CtrlClient(env_desc);	
+	MsgBus* msg_bus = new MsgBus();
 
 	int64_t this_machine_id = env_desc->GetMachineId(ctrl_server->this_machine_addr());
 	std::cout << "This machine id is: " << this_machine_id << std::endl;
-	IBVerbsCommNet ibverbs_comm_net(ctrl_client, this_machine_id);
+	IBVerbsCommNet ibverbs_comm_net(ctrl_client, msg_bus, this_machine_id);
 	HandleMachineProcess(this_machine_id, &ibverbs_comm_net);
 	
-	while(true) {}
 	delete env_desc;
 	delete ctrl_server;
 	delete ctrl_client;
+	delete msg_bus;
 
 	return 0;
 }

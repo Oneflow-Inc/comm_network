@@ -8,10 +8,11 @@ std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
   return "IBVerbsConnInfo/" + std::to_string(src_machine_id) + "/" + std::to_string(dst_machine_id);
 }
 
-IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id)
+IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, MsgBus* msg_bus, int64_t this_machine_id)
     : poll_exit_flag_(ATOMIC_FLAG_INIT),
       ctrl_client_(ctrl_client),
-      this_machine_id_(this_machine_id) {
+      this_machine_id_(this_machine_id),
+			msg_bus_(msg_bus) {
   int64_t total_machine_num = ctrl_client->env_desc()->TotalMachineNum();
   for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id) { continue; }
@@ -92,7 +93,7 @@ void IBVerbsCommNet::PollCQ() {
           break;
         }
         case IBV_WC_RECV: {
-          qp->RecvDone(wr_id);
+          qp->RecvDone(wr_id, msg_bus_);
           break;
         }
         default: {

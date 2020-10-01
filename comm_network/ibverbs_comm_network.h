@@ -3,12 +3,13 @@
 #include "comm_network/env_desc.h"
 #include "comm_network/ibverbs_qp.h"
 #include "comm_network/control/ctrl_client.h"
+#include "comm_network/msg_bus.h"
 
 namespace comm_network {
 class IBVerbsCommNet final {
  public:
   DISALLOW_COPY_AND_MOVE(IBVerbsCommNet);
-  IBVerbsCommNet(CtrlClient* ctrl_client, int64_t this_machine_id);
+  IBVerbsCommNet(CtrlClient* ctrl_client, MsgBus* msg_bus, int64_t this_machine_id);
   ~IBVerbsCommNet();
 
   const std::unordered_set<int64_t>& peer_machine_id() { return peer_machine_id_; }
@@ -34,5 +35,6 @@ class IBVerbsCommNet final {
   std::atomic_flag poll_exit_flag_;
   int64_t this_machine_id_;
   CtrlClient* ctrl_client_;
+	MsgBus* msg_bus_;
 };
 }  // namespace comm_network
