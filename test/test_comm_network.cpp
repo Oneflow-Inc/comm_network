@@ -22,14 +22,16 @@ EnvProto InitEnvProto(const std::vector<std::string>& ip_confs, int32_t ctrl_por
 
 void HandleMachineProcess(int64_t this_machine_id, IBVerbsCommNet* ibverbs_comm_net) {
 	switch(this_machine_id) {
-		case 0:
+		case 0: {
 			std::cout << "Machine 0: " << std::endl;
 			Msg msg;
 			ibverbs_comm_net->SendMsg(1, msg);	
 			break;
-		case 1:
+		}
+		case 1: {
 			std::cout << "Machine 1: " << std::endl;
 			break;
+		}
 		default:
 			std::cout << "Unsupport number of machines." << std::endl;
 	}		
