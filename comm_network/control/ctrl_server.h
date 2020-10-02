@@ -18,7 +18,7 @@ class CtrlServer {
   void PushKVEnqueueRequest();
   void PullKVEnqueueRequest();
   void BarrierEnqueueRequest();
-	void ClearKVEnqueueRequest();
+  void ClearKVEnqueueRequest();
   void Init();
 
   //  	template <CtrlMethod kMethod>
@@ -39,7 +39,7 @@ class CtrlServer {
              std::function<void(CtrlCall<CtrlMethod::kPushKV>*)>,
              std::function<void(CtrlCall<CtrlMethod::kPullKV>*)>,
              std::function<void(CtrlCall<CtrlMethod::kBarrier>*)>,
-						 std::function<void(CtrlCall<CtrlMethod::kClearKV>*)>>
+             std::function<void(CtrlCall<CtrlMethod::kClearKV>*)>>
       handlers_;
   std::unique_ptr<CtrlService::AsyncService> grpc_service_;
   std::unique_ptr<grpc::ServerCompletionQueue> cq_;

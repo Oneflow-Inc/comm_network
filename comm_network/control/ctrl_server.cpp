@@ -24,7 +24,7 @@ void CtrlServer::HandleRpcs() {
   PushKVEnqueueRequest();
   PullKVEnqueueRequest();
   BarrierEnqueueRequest();
-	ClearKVEnqueueRequest();
+  ClearKVEnqueueRequest();
 
   void* tag = nullptr;
   bool ok = false;
@@ -161,15 +161,15 @@ void CtrlServer::Init() {
   });
   std::get<3>(handlers_) = bind_barrier_func;
 
-	const auto& bind_clearkv_func =	([this](CtrlCall<CtrlMethod::kClearKV>* call) {
+  const auto& bind_clearkv_func = ([this](CtrlCall<CtrlMethod::kClearKV>* call) {
     const std::string& k = call->request().key();
     CHECK_EQ(kv_.erase(k), 1);
     CHECK(pending_kv_calls_.find(k) == pending_kv_calls_.end());
     call->SendResponse();
-		ClearKVEnqueueRequest();
-    //EnqueueRequest<CtrlMethod::kClearKV>();
-  });	
-	std::get<4>(handlers_) = bind_clearkv_func;
+    ClearKVEnqueueRequest();
+    // EnqueueRequest<CtrlMethod::kClearKV>();
+  });
+  std::get<4>(handlers_) = bind_clearkv_func;
 }
 
 }  // namespace comm_network

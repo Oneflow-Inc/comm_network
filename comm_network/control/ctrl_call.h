@@ -20,8 +20,8 @@ class CtrlCallIf {
 enum class CtrlMethod { kLoadServer, kPushKV, kPullKV, kBarrier, kClearKV };
 using CtrlRequestTuple =
     std::tuple<LoadServerRequest, PushKVRequest, PullKVRequest, BarrierRequest, ClearKVRequest>;
-using CtrlResponseTuple =
-    std::tuple<LoadServerResponse, PushKVResponse, PullKVResponse, BarrierResponse, ClearKVResponse>;
+using CtrlResponseTuple = std::tuple<LoadServerResponse, PushKVResponse, PullKVResponse,
+                                     BarrierResponse, ClearKVResponse>;
 
 template<CtrlMethod ctrl_method>
 using CtrlRequest =

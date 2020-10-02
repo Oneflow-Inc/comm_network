@@ -61,7 +61,7 @@ int main(int argc, char* argv[]) {
 	int64_t this_machine_id = env_desc->GetMachineId(ctrl_server->this_machine_addr());
 	std::cout << "This machine id is: " << this_machine_id << std::endl;
 	IBVerbsCommNet ibverbs_comm_net(ctrl_client, msg_bus, this_machine_id);
-	int num_of_register_buffer = 2;
+	int num_of_register_buffer = 1;
 	size_t buffer_size = 4 * 1024 * 1024;
 	for (int i = 0;i < num_of_register_buffer;i++) {
 		void* buffer = malloc(buffer_size);
@@ -74,8 +74,9 @@ int main(int argc, char* argv[]) {
 	delete ctrl_server;
 	delete ctrl_client;
 	delete msg_bus;
-	for (IBVerbsMemDesc* mem_desc : ibverbs_comm_net.mem_desc()) {
-		ibverbs_comm_net.UnRegisterMemory(mem_desc);
+	while (!ibverbs_comm_net.mem_desc().empty()) {
+		auto iter = ibverbs_comm_net.mem_desc().begin();
+		ibverbs_comm_net.UnRegisterMemory(*iter);
 	}
 	return 0;
 }

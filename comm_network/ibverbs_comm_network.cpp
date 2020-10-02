@@ -16,9 +16,9 @@ IBVerbsCommNet::IBVerbsCommNet(CtrlClient* ctrl_client, MsgBus* msg_bus, int64_t
     : poll_exit_flag_(ATOMIC_FLAG_INIT),
       ctrl_client_(ctrl_client),
       this_machine_id_(this_machine_id),
-			msg_bus_(msg_bus) {
+      msg_bus_(msg_bus) {
   int64_t total_machine_num = ctrl_client->env_desc()->TotalMachineNum();
-	token2mem_desc_.resize(total_machine_num);
+  token2mem_desc_.resize(total_machine_num);
   for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id) { continue; }
     peer_machine_id_.insert(i);
@@ -134,15 +134,16 @@ void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, const Msg& msg) {
   qp_vec_.at(dst_machine_id)->PostSendRequest(msg);
 }
 
-void IBVerbsCommNet::Read(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size) {
-	// send message to source notify it to write data
+void IBVerbsCommNet::Read(int64_t src_machine_id, void* src_addr, void* dst_addr,
+                          size_t data_size) {
+  // send message to source notify it to write data
 }
 
 void* IBVerbsCommNet::RegisterMemory(void* ptr, size_t byte_size) {
-	IBVerbsMemDesc* mem_desc = new IBVerbsMemDesc(pd_, ptr, byte_size);
+  IBVerbsMemDesc* mem_desc = new IBVerbsMemDesc(pd_, ptr, byte_size);
   std::unique_lock<std::mutex> lck(mem_desc_mtx_);
   CHECK(mem_desc_.insert(mem_desc).second);
-  return mem_desc;	
+  return mem_desc;
 }
 
 void IBVerbsCommNet::UnRegisterMemory(void* token) {
