@@ -5,7 +5,8 @@
 #include "comm_network/control/ctrl_client.h"
 #include "comm_network/ibverbs_comm_network.h"
 #include "comm_network/message.h"
-#include "comm_network/msg_bus.h"
+#include "comm_network/global.h"
+#include "comm_network/channel.h"
 
 using namespace comm_network;
 
@@ -21,63 +22,104 @@ EnvProto InitEnvProto(const std::vector<std::string>& ip_confs, int32_t ctrl_por
 	return env_proto;
 }
 
-void HandleMachineProcess(int64_t this_machine_id, IBVerbsCommNet* ibverbs_comm_net, MsgBus* msg_bus) {
-	switch(this_machine_id) {
-		case 0: {
-			std::cout << "In Machine 0 Handle Procedure: " << std::endl;
-			int test_data_arr[100];
-			for (int i = 0;i < 100;i++) {
-				test_data_arr[i] = i;
-			}
-			Msg msg(0, 1, test_data_arr, 100 * sizeof(int), MsgType::DataIsReady);
-			ibverbs_comm_net->SendMsg(1, msg);	
-			break;
-		}
-		case 1: {
-			std::cout << "In Machine 1 Handle Procedure: " << std::endl;
-			while (msg_bus->is_empty()) {}
-			Msg msg = msg_bus->GetAndRemoveTopRecvMsg();
-			size_t data_arr_size = msg.data_size();
-			void* data = malloc(data_arr_size);
-			//ibverbs_comm_net->Read(msg.src_id(), msg.src_addr(), data, data_arr_size);
-			break;
-		}
-		default:
-			std::cout << "Unsupport number of machines." << std::endl;
-	}		
-}
-
 int main(int argc, char* argv[]) {
 	std::string ip_confs_raw_array[2] = {"192.168.1.12", "192.168.1.13"};
-	//std::string ip_confs_raw_array[1] = {"192.168.1.12"};
 	int32_t ctrl_port = 10534;
 	std::vector<std::string> ip_confs(ip_confs_raw_array, ip_confs_raw_array + 2);
 	EnvProto env_proto = InitEnvProto(ip_confs, ctrl_port);
 	EnvDesc* env_desc = new EnvDesc(env_proto);
-	CtrlServer* ctrl_server = new CtrlServer(ctrl_port);
-	CtrlClient* ctrl_client = new CtrlClient(env_desc);	
-	MsgBus* msg_bus = new MsgBus();
-
-	int64_t this_machine_id = env_desc->GetMachineId(ctrl_server->this_machine_addr());
+	Channel<Msg>* action_channel = new Channel<Msg>();
+	Global<CtrlServer>::New(ctrl_port);
+	Global<CtrlClient>::New(env_desc);
+	Global<IBVerbsCommNet>::New(action_channel);
+	
+	int64_t this_machine_id = env_desc->GetMachineId(Global<CtrlServer>::Get()->this_machine_addr());
 	std::cout << "This machine id is: " << this_machine_id << std::endl;
-	IBVerbsCommNet ibverbs_comm_net(ctrl_client, msg_bus, this_machine_id);
-	int num_of_register_buffer = 1;
+	if (this_machine_id == 0) {
+		int test_data_arr[100];
+		for (int i = 0;i < 100;i++) {
+			test_data_arr[i] = i;
+		}
+		Msg msg;
+		msg.msg_type = MsgType::DataIsReady;
+		DataIsReady data_is_ready;
+		data_is_ready.src_addr = test_data_arr;
+		data_is_ready.data_size = 100 * sizeof(int);
+		data_is_ready.src_machine_id = this_machine_id;
+		data_is_ready.dst_machine_id = 1;
+		msg.data_is_ready = data_is_ready; 
+		action_channel->Send(msg);
+	}
+	int num_of_register_buffer = 4;
 	size_t buffer_size = 4 * 1024 * 1024;
 	for (int i = 0;i < num_of_register_buffer;i++) {
 		void* buffer = malloc(buffer_size);
-		ibverbs_comm_net.RegisterMemory(buffer, buffer_size);
+		Global<IBVerbsCommNet>::Get()->RegisterMemory(buffer, buffer_size);
 	}
-	ibverbs_comm_net.RegisterMemoryDone();
-	HandleMachineProcess(this_machine_id, &ibverbs_comm_net, msg_bus);
+	Global<IBVerbsCommNet>::Get()->RegisterMemoryDone();
+
+	std::thread action_poller = std::thread([&]() {
+		Msg msg;
+		while (action_channel->Receive(&msg) == kChannelStatusSuccess) {
+			switch (msg.msg_type) {
+				case(MsgType::DataIsReady): {
+					int64_t dst_machine_id = msg.data_is_ready.dst_machine_id;
+					Global<IBVerbsCommNet>::Get()->SendMsg(dst_machine_id, msg);	
+					break;
+				}
+				case(MsgType::AllocateMemory): {
+					size_t data_size = msg.allocate_memory.data_size;
+					int64_t src_machine_id = msg.allocate_memory.src_machine_id;
+					void* src_addr = msg.allocate_memory.src_addr;
+					void* data = malloc(data_size);	
+					Msg new_msg;
+					new_msg.msg_type = MsgType::PleaseWrite;
+					PleaseWrite please_write;
+					please_write.src_addr = src_addr;
+					please_write.dst_addr = data;
+					please_write.data_size = data_size;
+					please_write.src_machine_id = src_machine_id;
+					please_write.dst_machine_id = this_machine_id;
+					new_msg.please_write = please_write; 
+					action_channel->Send(msg);	
+					break;
+				}
+				case(MsgType::PleaseWrite): {
+					int64_t src_machine_id = msg.please_write.src_machine_id;
+					Global<IBVerbsCommNet>::Get()->SendMsg(src_machine_id, msg);
+					break;
+				}
+				case(MsgType::DoWrite): {
+					void* src_addr = msg.please_write.src_addr;
+					void* dst_addr = msg.please_write.dst_addr;
+					size_t data_size = msg.please_write.data_size;
+					int64_t src_machine_id = msg.please_write.src_machine_id;
+					int64_t dst_machine_id = msg.please_write.dst_machine_id;
+					//Global<IBVerbsCommNet>::Get()->AsyncWrite(src_machine_id, dst_machine_id, src_addr, dst_addr, data_size);
+					break;
+				}
+				case(MsgType::FreeBufferPair): {
+					break;
+				}
+				default: {
+					std::cout << "Unsupport message" << std::endl;
+				}
+			}
+		}
+	});
+	sleep(5);
 	
 	delete env_desc;
-	delete ctrl_server;
-	delete ctrl_client;
-	delete msg_bus;
-	while (!ibverbs_comm_net.mem_desc().empty()) {
-		auto iter = ibverbs_comm_net.mem_desc().begin();
-		ibverbs_comm_net.UnRegisterMemory(*iter);
+	Global<CtrlServer>::Delete();
+	Global<CtrlClient>::Delete();
+	action_channel->Close();
+	action_poller.join();
+	delete action_channel;
+	while (!Global<IBVerbsCommNet>::Get()->mem_desc().empty()) {
+		auto iter = Global<IBVerbsCommNet>::Get()->mem_desc().begin();
+		Global<IBVerbsCommNet>::Get()->UnRegisterMemory(*iter);
 	}
+	Global<IBVerbsCommNet>::Delete();
 	return 0;
 }
 

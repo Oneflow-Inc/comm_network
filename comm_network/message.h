@@ -1,29 +1,52 @@
 #pragma once
 
 namespace comm_network {
-enum class MsgType { DataIsReady, PleaseWrite };
+enum class MsgType { DataIsReady, PleaseWrite, AllocateMemory, DoWrite, FreeBufferPair};
 
-class Msg {
- public:
-  Msg() = default;
-  Msg(int64_t src_id, int64_t dst_id, void* src_addr, size_t src_data_size, MsgType msg_type)
-      : src_id_(src_id),
-        dst_id_(dst_id),
-        src_addr_(src_addr),
-        src_data_size_(src_data_size),
-        msg_type_(msg_type) {}
-  ~Msg() = default;
-  int64_t src_id() const { return src_id_; }
-  int64_t dst_id() const { return dst_id_; }
-  size_t data_size() const { return src_data_size_; }
-  void* src_addr() const { return src_addr_; }
-  MsgType msg_type() const { return msg_type_; }
-
- private:
-  MsgType msg_type_;
-  void* src_addr_;
-  size_t src_data_size_;
-  int64_t src_id_;
-  int64_t dst_id_;
+struct DataIsReady {
+	void* src_addr;
+	size_t data_size;
+	int64_t src_machine_id;
+	int64_t dst_machine_id;
 };
+
+struct AllocateMemory {
+	size_t data_size;
+	void* src_addr;
+	int64_t src_machine_id;
+};
+
+struct PleaseWrite {
+	void* src_addr;
+	void* dst_addr;
+	size_t data_size;
+	int64_t src_machine_id;
+	int64_t dst_machine_id;
+};
+
+struct DoWrite {
+	void* src_addr;
+	void* dst_addr;
+	size_t data_size;
+	int64_t src_machine_id;
+	int64_t dst_machine_id;	
+};
+
+struct FreeBufferPair {
+	void* src_token;
+	void* dst_token;
+	int64_t machine_id;
+};
+
+struct Msg {
+	MsgType msg_type;
+	union {
+		DataIsReady data_is_ready;
+		PleaseWrite please_write;
+		FreeBufferPair free_buffer_pair;
+		AllocateMemory allocate_memory;
+		DoWrite do_write;
+	};
+};
+
 }  // namespace comm_network

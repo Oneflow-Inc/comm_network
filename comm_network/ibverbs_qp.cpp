@@ -156,9 +156,17 @@ void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
   DeleteWorkRequestId(wr_id);
 }
 
-void IBVerbsQP::RecvDone(WorkRequestId* wr_id, MsgBus* msg_bus) {
-  // Global<ActorMsgBus>::Get()->SendMsgWithoutCommNet(wr_id->msg_mr->msg());
-  msg_bus->AddNewMsg(wr_id->msg_mr->msg());
+void IBVerbsQP::RecvDone(WorkRequestId* wr_id, Channel<Msg>* msg_channel) {
+  Msg recv_msg = wr_id->msg_mr->msg(); 
+  CHECK(recv_msg.msg_type == MsgType::DataIsReady);
+  Msg msg;
+  msg.msg_type = MsgType::AllocateMemory;
+  AllocateMemory allocate_memory;
+  allocate_memory.data_size = recv_msg.data_is_ready.data_size;
+  allocate_memory.src_addr = recv_msg.data_is_ready.src_addr;
+  allocate_memory.src_machine_id = recv_msg.data_is_ready.src_machine_id;
+  msg.allocate_memory = allocate_memory;
+  msg_channel->Send(msg);
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }

@@ -8,6 +8,9 @@
 #include <vector>
 #include <queue>
 #include <memory>
+#include <condition_variable>
+#include <forward_list>
+#include "comm_network/global.h"
 
 namespace comm_network {
 const size_t rdma_recv_msg_buf_byte = 6 * 1024 * 1024;

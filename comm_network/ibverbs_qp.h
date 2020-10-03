@@ -1,7 +1,7 @@
 #pragma once
 #include "comm_network/ibverbs_memory_desc.h"
 #include "comm_network/message.h"
-#include "comm_network/msg_bus.h"
+#include "comm_network/channel.h"
 
 namespace comm_network {
 class MsgMR final {
@@ -49,7 +49,7 @@ class IBVerbsQP final {
 
   void ReadDone(WorkRequestId*);
   void SendDone(WorkRequestId*);
-  void RecvDone(WorkRequestId*, MsgBus*);
+  void RecvDone(WorkRequestId*, Channel<Msg>*);
 
  private:
   WorkRequestId* NewWorkRequestId();

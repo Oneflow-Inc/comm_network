@@ -12,9 +12,9 @@ using PbMessage = google::protobuf::Message;
 #define PP_STRINGIZE(x) PP_INTERNAL_STRINGIZE(x)
 #define FILE_LINE_STR __FILE__ ":" PP_STRINGIZE(__LINE__)
 
-#define BARRIER_ALL(ctrl_client) ctrl_client->Barrier(FILE_LINE_STR)
-#define BARRIER(ctrl_client) \
-  ctrl_client->Barrier(FILE_LINE_STR, ctrl_client->env_desc()->TotalMachineNum())
+#define BARRIER_ALL() Global<CtrlClient>::Get()->Barrier(FILE_LINE_STR)
+#define BARRIER() \
+  Global<CtrlClient>::Get()->Barrier(FILE_LINE_STR, Global<CtrlClient>::Get()->env_desc()->TotalMachineNum())
 
 class CtrlClient {
  public:
