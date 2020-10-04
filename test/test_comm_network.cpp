@@ -50,12 +50,7 @@ int main(int argc, char* argv[]) {
 		msg.data_is_ready = data_is_ready; 
 		action_channel->Send(msg);
 	}
-	int num_of_register_buffer = 4;
-	size_t buffer_size = 4 * 1024 * 1024;
-	for (int i = 0;i < num_of_register_buffer;i++) {
-		void* buffer = malloc(buffer_size);
-		Global<IBVerbsCommNet>::Get()->RegisterMemory(buffer, buffer_size);
-	}
+	Global<IBVerbsCommNet>::Get()->RegisterFixNumMemory();
 	Global<IBVerbsCommNet>::Get()->RegisterMemoryDone();
 
 	std::thread action_poller = std::thread([&]() {
@@ -86,6 +81,7 @@ int main(int argc, char* argv[]) {
 				}
 				case(MsgType::PleaseWrite): {
 					int64_t src_machine_id = msg.please_write.src_machine_id;
+					std::cout << src_machine_id << std::endl;
 					Global<IBVerbsCommNet>::Get()->SendMsg(src_machine_id, msg);
 					break;
 				}
@@ -95,7 +91,7 @@ int main(int argc, char* argv[]) {
 					size_t data_size = msg.please_write.data_size;
 					int64_t src_machine_id = msg.please_write.src_machine_id;
 					int64_t dst_machine_id = msg.please_write.dst_machine_id;
-					//Global<IBVerbsCommNet>::Get()->AsyncWrite(src_machine_id, dst_machine_id, src_addr, dst_addr, data_size);
+					Global<IBVerbsCommNet>::Get()->AsyncWrite(src_machine_id, dst_machine_id, src_addr, dst_addr, data_size);
 					break;
 				}
 				case(MsgType::FreeBufferPair): {
@@ -107,7 +103,7 @@ int main(int argc, char* argv[]) {
 			}
 		}
 	});
-	sleep(5);
+	sleep(10);
 	
 	delete env_desc;
 	Global<CtrlServer>::Delete();
@@ -115,10 +111,7 @@ int main(int argc, char* argv[]) {
 	action_channel->Close();
 	action_poller.join();
 	delete action_channel;
-	while (!Global<IBVerbsCommNet>::Get()->mem_desc().empty()) {
-		auto iter = Global<IBVerbsCommNet>::Get()->mem_desc().begin();
-		Global<IBVerbsCommNet>::Get()->UnRegisterMemory(*iter);
-	}
+	Global<IBVerbsCommNet>::Get()->UnRegisterFixNumMemory();	
 	Global<IBVerbsCommNet>::Delete();
 	return 0;
 }

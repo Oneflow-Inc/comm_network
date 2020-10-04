@@ -8,16 +8,19 @@ std::string GenTokensMsgKey(int64_t machine_id) {
   return "IBVerbsTokensMsg/" + std::to_string(machine_id);
 }
 
+std::string GenRegisterMemoryKey(std::string prefix, int64_t idx) {
+  return prefix + std::to_string(idx);
+}
+
 std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
   return "IBVerbsConnInfo/" + std::to_string(src_machine_id) + "/" + std::to_string(dst_machine_id);
 }
 
 IBVerbsCommNet::IBVerbsCommNet(Channel<Msg> *action_channel)
-    : action_channel_(action_channel) {
+    : poll_exit_flag_(ATOMIC_FLAG_INIT), action_channel_(action_channel) {
   int64_t total_machine_num = Global<CtrlClient>::Get()->env_desc()->TotalMachineNum();
   this_machine_id_ = Global<CtrlClient>::Get()->env_desc()->GetMachineId(Global<CtrlServer>::Get()->this_machine_addr());
-  token2send_mem_desc_.resize(total_machine_num);
-  token2recv_mem_desc_.resize(total_machine_num);
+  recv_mem_desc_.resize(total_machine_num);
   for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id_) { continue; }
     peer_machine_id_.insert(i);
@@ -61,12 +64,48 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg> *action_channel)
     Global<CtrlClient>::Get()->ClearKV(GenConnInfoKey(this_machine_id_, peer_id));
   }
   BARRIER();
-  poller_ = new IBverbsPoller();
+  poller_ = new IBVerbsPoller();
   poller_->Start();
+  poll_thread_ = std::thread(&IBVerbsCommNet::PollCQ, this);
   BARRIER();
 }
 
+void IBVerbsCommNet::PollCQ() {
+  std::vector<ibv_wc> wc_vec(max_poll_wc_num_);
+  while (poll_exit_flag_.test_and_set() == false) {
+    poll_exit_flag_.clear();
+    int32_t found_wc_num = ibv_poll_cq(cq_, max_poll_wc_num_, wc_vec.data());
+    CHECK_GE(found_wc_num, 0);
+    FOR_RANGE(int32_t, i, 0, found_wc_num) {
+      const ibv_wc& wc = wc_vec.at(i);
+      CHECK_EQ(wc.status, IBV_WC_SUCCESS) << wc.opcode;
+      WorkRequestId* wr_id = reinterpret_cast<WorkRequestId*>(wc.wr_id);
+      IBVerbsQP* qp = wr_id->qp;
+      switch (wc.opcode) {
+        case IBV_WC_RDMA_READ: {
+          qp->ReadDone(wr_id);
+          break;
+        }
+        case IBV_WC_SEND: {
+          qp->SendDone(wr_id);
+          break;
+        }
+        case IBV_WC_RECV: {
+          qp->RecvDone(wr_id, action_channel_);
+          break;
+        }
+        default: {
+          LOG(FATAL) << "UNIMPLEMENTED";
+          break;
+        }
+      }
+    }
+  }
+}
+
 IBVerbsCommNet::~IBVerbsCommNet() {
+  while (poll_exit_flag_.test_and_set() == true) {}
+  poll_thread_.join();
   poller_->Stop();
   delete poller_;
   for (IBVerbsQP* qp : qp_vec_) {
@@ -77,66 +116,20 @@ IBVerbsCommNet::~IBVerbsCommNet() {
   CHECK_EQ(ibv_close_device(context_), 0);
 }
 
-// void IBVerbsCommNet::PollCQ() {
-//   std::vector<ibv_wc> wc_vec(max_poll_wc_num_);
-//   while (poll_exit_flag_.test_and_set() == false) {
-//     poll_exit_flag_.clear();
-//     int32_t found_wc_num = ibv_poll_cq(cq_, max_poll_wc_num_, wc_vec.data());
-//     CHECK_GE(found_wc_num, 0);
-//     FOR_RANGE(int32_t, i, 0, found_wc_num) {
-//       const ibv_wc& wc = wc_vec.at(i);
-//       CHECK_EQ(wc.status, IBV_WC_SUCCESS) << wc.opcode;
-//       WorkRequestId* wr_id = reinterpret_cast<WorkRequestId*>(wc.wr_id);
-//       IBVerbsQP* qp = wr_id->qp;
-//       switch (wc.opcode) {
-//         case IBV_WC_RDMA_READ: {
-//           qp->ReadDone(wr_id);
-//           break;
-//         }
-//         case IBV_WC_SEND: {
-//           qp->SendDone(wr_id);
-//           break;
-//         }
-//         case IBV_WC_RECV: {
-//           qp->RecvDone(wr_id, msg_bus_);
-//           break;
-//         }
-//         default: {
-//           LOG(FATAL) << "UNIMPLEMENTED";
-//           break;
-//         }
-//       }
-//     }
-//   }
-// }
-
 void IBVerbsCommNet::RegisterMemoryDone() {
   IBVerbsTokensMsg this_tokens_msg;
-	int idx = 0;
-  for (IBVerbsMemDesc* mem_desc : mem_desc_) {
-		if (idx < mem_desc_.size() / 2 ) {
-			token2send_mem_desc_.at(this_machine_id_).emplace(reinterpret_cast<void*>(mem_desc), mem_desc->ToProto());
-    	this_tokens_msg.mutable_token2send_mem_desc()->insert(
-        {reinterpret_cast<uint64_t>(mem_desc), mem_desc->ToProto()});
-		} else {
-			token2recv_mem_desc_.at(this_machine_id_).emplace(reinterpret_cast<void*>(mem_desc), mem_desc->ToProto());
-    	this_tokens_msg.mutable_token2recv_mem_desc()->insert(
-        {reinterpret_cast<uint64_t>(mem_desc), mem_desc->ToProto()});
-		}
+  for (int i = 0; i < num_of_register_buffer / 2; i++) {
+    std::string key = GenRegisterMemoryKey("recv", i);
+    IBVerbsMemDesc* mem_desc = mem_desc_[key];
+    this_tokens_msg.mutable_recv_mem_desc()->insert(
+        {i, mem_desc->ToProto()});
   }
   Global<CtrlClient>::Get()->PushKV(GenTokensMsgKey(this_machine_id_), this_tokens_msg);
   for (int64_t peer_id : peer_machine_id()) {
     IBVerbsTokensMsg peer_tokens_msg;
     Global<CtrlClient>::Get()->PullKV(GenTokensMsgKey(peer_id), &peer_tokens_msg);
-    for (const auto& pair : peer_tokens_msg.token2send_mem_desc()) {
-      CHECK(token2send_mem_desc_.at(peer_id)
-                .emplace(reinterpret_cast<void*>(pair.first), pair.second)
-                .second);
-    }
-    for (const auto& pair : peer_tokens_msg.token2recv_mem_desc()) {
-      CHECK(token2recv_mem_desc_.at(peer_id)
-                .emplace(reinterpret_cast<void*>(pair.first), pair.second)
-                .second);
+    for (const auto& pair : peer_tokens_msg.recv_mem_desc()) {
+      recv_mem_desc_.at(peer_id).emplace(pair.first, pair.second);
     }
   }
   BARRIER();
@@ -154,22 +147,38 @@ void IBVerbsCommNet::Read(int64_t src_machine_id, void* src_addr, void* dst_addr
 	// ibverbs_comm_net->SendMsg(src_machine_id, msg);	
 }
 
-void IBVerbsCommNet::AsyncWrite(int64_t dst_machine_id, void* src_addr, void* dst_addr, size_t data_size) {
-	
+void IBVerbsCommNet::AsyncWrite(int64_t src_machine_id, int64_t dst_machine_id, void* src_addr, void* dst_addr, size_t data_size) {
+  poller_->AsyncWrite(src_machine_id, dst_machine_id, src_addr, dst_addr, data_size);
 }
 
-void* IBVerbsCommNet::RegisterMemory(void* ptr, size_t byte_size) {
+void* IBVerbsCommNet::RegisterMemory(std::string key, void* ptr, size_t byte_size) {
   IBVerbsMemDesc* mem_desc = new IBVerbsMemDesc(pd_, ptr, byte_size);
-  std::unique_lock<std::mutex> lck(mem_desc_mtx_);
-  CHECK(mem_desc_.insert(mem_desc).second);
+  mem_desc_.emplace(key, mem_desc);
   return mem_desc;
 }
 
-void IBVerbsCommNet::UnRegisterMemory(void* token) {
-  IBVerbsMemDesc* mem_desc = static_cast<IBVerbsMemDesc*>(token);
+void IBVerbsCommNet::UnRegisterMemory(std::string key) {
+  IBVerbsMemDesc* mem_desc = mem_desc_[key];
   delete mem_desc;
-  std::unique_lock<std::mutex> lck(mem_desc_mtx_);
-  CHECK_EQ(mem_desc_.erase(mem_desc), 1);
+  CHECK_EQ(mem_desc_.erase(key), 1);
+}
+
+void IBVerbsCommNet::RegisterFixNumMemory() {
+  for (int j = 0;j < 2;j++) {
+    std::string prefix = (j == 0 ? "send" : "recv");
+    for (int i = 0;i < num_of_register_buffer / 2;i++) {
+      std::string key = GenRegisterMemoryKey(prefix, i);
+      void* buffer = malloc(buffer_size);
+      RegisterMemory(key, buffer, buffer_size);
+    }
+  }
+}
+
+void IBVerbsCommNet::UnRegisterFixNumMemory() {
+  while (mem_desc().empty()) {
+		auto iter = Global<IBVerbsCommNet>::Get()->mem_desc().begin();
+		Global<IBVerbsCommNet>::Get()->UnRegisterMemory(iter->first);
+	}
 }
 
 const int32_t IBVerbsCommNet::max_poll_wc_num_ = 32;

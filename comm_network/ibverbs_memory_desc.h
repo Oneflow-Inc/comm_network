@@ -5,7 +5,6 @@
 #include "comm_network/utils.h"
 
 namespace comm_network {
-
 class IBVerbsMemDesc final {
  public:
   DISALLOW_COPY_AND_MOVE(IBVerbsMemDesc);

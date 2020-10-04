@@ -14,7 +14,6 @@ message IBVerbsConnectionInfo {
 }
 
 message IBVerbsTokensMsg {
-  map<uint64, IBVerbsMemDescProto> token2send_mem_desc = 1;
-	map<uint64, IBVerbsMemDescProto> token2recv_mem_desc = 2;
+	map<int32, IBVerbsMemDescProto> recv_mem_desc = 2;
 }
 

@@ -4,6 +4,8 @@
 
 namespace comm_network {
 static const size_t kMB = 1024 * 1024;
+static const int num_of_register_buffer = 4;
+static const size_t buffer_size = 4 * kMB;
 
 class EnvDesc {
  public:

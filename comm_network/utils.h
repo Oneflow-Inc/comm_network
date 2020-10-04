@@ -8,6 +8,7 @@
 #include <vector>
 #include <queue>
 #include <memory>
+#include <atomic>
 #include <condition_variable>
 #include <forward_list>
 #include "comm_network/global.h"
