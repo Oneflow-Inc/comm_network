@@ -82,16 +82,7 @@ int main(int argc, char* argv[]) {
 				case(MsgType::PleaseWrite): {
 					int64_t src_machine_id = msg.please_write.src_machine_id;
 					std::cout << src_machine_id << std::endl;
-					Msg new_msg;
-					new_msg.msg_type = MsgType::DoWrite;
-					DoWrite do_write;
-					do_write.src_addr = msg.please_write.src_addr;
-					do_write.dst_addr = msg.please_write.dst_addr;
-					do_write.data_size = msg.please_write.data_size;
-					do_write.src_machine_id = msg.please_write.src_machine_id;
-					do_write.dst_machine_id = msg.please_write.dst_machine_id;
-					new_msg.do_write = do_write; 
-					Global<IBVerbsCommNet>::Get()->SendMsg(src_machine_id, new_msg);
+					Global<IBVerbsCommNet>::Get()->SendMsg(src_machine_id, msg);
 					break;
 				}
 				case(MsgType::DoWrite): {

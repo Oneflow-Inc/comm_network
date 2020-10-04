@@ -158,15 +158,36 @@ void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
 
 void IBVerbsQP::RecvDone(WorkRequestId* wr_id, Channel<Msg>* msg_channel) {
   Msg recv_msg = wr_id->msg_mr->msg(); 
-  CHECK(recv_msg.msg_type == MsgType::DataIsReady);
-  Msg msg;
-  msg.msg_type = MsgType::AllocateMemory;
-  AllocateMemory allocate_memory;
-  allocate_memory.data_size = recv_msg.data_is_ready.data_size;
-  allocate_memory.src_addr = recv_msg.data_is_ready.src_addr;
-  allocate_memory.src_machine_id = recv_msg.data_is_ready.src_machine_id;
-  msg.allocate_memory = allocate_memory;
-  msg_channel->Send(msg);
+  switch (recv_msg.msg_type) {
+    case (MsgType::DataIsReady): {
+      Msg msg;
+      msg.msg_type = MsgType::AllocateMemory;
+      AllocateMemory allocate_memory;
+      allocate_memory.data_size = recv_msg.data_is_ready.data_size;
+      allocate_memory.src_addr = recv_msg.data_is_ready.src_addr;
+      allocate_memory.src_machine_id = recv_msg.data_is_ready.src_machine_id;
+      msg.allocate_memory = allocate_memory;
+      msg_channel->Send(msg);
+      break;
+    }
+    case (MsgType::PleaseWrite): {
+      Msg msg;
+      msg.msg_type = MsgType::DoWrite;
+      DoWrite do_write;
+      do_write.src_addr = recv_msg.please_write.src_addr;
+      do_write.dst_addr = recv_msg.please_write.dst_addr;
+      do_write.data_size = recv_msg.please_write.data_size;
+      do_write.src_machine_id = recv_msg.please_write.src_machine_id;
+      do_write.dst_machine_id = recv_msg.please_write.dst_machine_id;
+      msg.do_write = do_write; 
+      msg_channel->Send(msg);
+      break;
+    }
+    default: {
+      LOG(INFO) << "Unsupport receive message type";
+      break;
+    }
+  }
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }
