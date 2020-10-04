@@ -86,10 +86,10 @@ int main(int argc, char* argv[]) {
 					new_msg.msg_type = MsgType::DoWrite;
 					DoWrite do_write;
 					do_write.src_addr = msg.please_write.src_addr;
-					do_write.dst_addr = msg.please_write.data;
+					do_write.dst_addr = msg.please_write.dst_addr;
 					do_write.data_size = msg.please_write.data_size;
 					do_write.src_machine_id = msg.please_write.src_machine_id;
-					do_write.dst_machine_id = msg.please_write.this_machine_id;
+					do_write.dst_machine_id = msg.please_write.dst_machine_id;
 					new_msg.do_write = do_write; 
 					Global<IBVerbsCommNet>::Get()->SendMsg(src_machine_id, new_msg);
 					break;
