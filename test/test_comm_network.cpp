@@ -76,21 +76,31 @@ int main(int argc, char* argv[]) {
 					please_write.src_machine_id = src_machine_id;
 					please_write.dst_machine_id = this_machine_id;
 					new_msg.please_write = please_write; 
-					action_channel->Send(msg);	
+					action_channel->Send(new_msg);	
 					break;
 				}
 				case(MsgType::PleaseWrite): {
 					int64_t src_machine_id = msg.please_write.src_machine_id;
 					std::cout << src_machine_id << std::endl;
-					Global<IBVerbsCommNet>::Get()->SendMsg(src_machine_id, msg);
+					Msg new_msg;
+					new_msg.msg_type = MsgType::DoWrite;
+					DoWrite do_write;
+					do_write.src_addr = msg.please_write.src_addr;
+					do_write.dst_addr = msg.please_write.data;
+					do_write.data_size = msg.please_write.data_size;
+					do_write.src_machine_id = msg.please_write.src_machine_id;
+					do_write.dst_machine_id = msg.please_write.this_machine_id;
+					new_msg.do_write = do_write; 
+					Global<IBVerbsCommNet>::Get()->SendMsg(src_machine_id, new_msg);
 					break;
 				}
 				case(MsgType::DoWrite): {
-					void* src_addr = msg.please_write.src_addr;
-					void* dst_addr = msg.please_write.dst_addr;
-					size_t data_size = msg.please_write.data_size;
-					int64_t src_machine_id = msg.please_write.src_machine_id;
-					int64_t dst_machine_id = msg.please_write.dst_machine_id;
+					void* src_addr = msg.do_write.src_addr;
+					void* dst_addr = msg.do_write.dst_addr;
+					size_t data_size = msg.do_write.data_size;
+					int64_t src_machine_id = msg.do_write.src_machine_id;
+					int64_t dst_machine_id = msg.do_write.dst_machine_id;
+					std::cout << "write from " << src_machine_id << " to " << dst_machine_id << std::endl;
 					Global<IBVerbsCommNet>::Get()->AsyncWrite(src_machine_id, dst_machine_id, src_addr, dst_addr, data_size);
 					break;
 				}
