@@ -2,6 +2,7 @@
 #include "comm_network/ibverbs_qp.h"
 #include "comm_network/message.h"
 #include "comm_network/utils.h"
+#include "comm_network/ibverbs_comm_network.h"
 
 namespace comm_network {
 IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv_cq) {
@@ -121,6 +122,28 @@ void IBVerbsQP::PostReadRequest(const IBVerbsMemDescProto& remote_mem,
   }
 }
 
+void IBVerbsQP::PostWriteRequest(const IBVerbsMemDescProto& remote_mem, const IBVerbsMemDesc& local_mem, 
+    WritePartial* write_partial) {
+  CHECK_EQ(remote_mem.mem_ptr_size(), local_mem.sge_vec().size());
+  WorkRequestId* wr_id = NewWorkRequestId();
+  wr_id->outstanding_sge_cnt = local_mem.sge_vec().size();
+  wr_id->write_partial = write_partial;
+  FOR_RANGE(size_t, i, 0, local_mem.sge_vec().size()) {
+    ibv_send_wr wr;
+    wr.wr_id = reinterpret_cast<uint64_t>(wr_id);
+    wr.next = nullptr;
+    wr.sg_list = const_cast<ibv_sge*>(&(local_mem.sge_vec().at(i)));
+    wr.num_sge = 1;
+    wr.opcode = IBV_WR_RDMA_WRITE;
+    wr.send_flags = 0;
+    wr.imm_data = 0;
+    wr.wr.rdma.remote_addr = remote_mem.mem_ptr(i);
+    wr.wr.rdma.rkey = remote_mem.mr_rkey(i);
+    ibv_send_wr* bad_wr = nullptr;
+    CHECK_EQ(ibv_post_send(qp_, &wr, &bad_wr), 0);
+  }
+}
+
 void IBVerbsQP::PostSendRequest(const Msg& msg) {
   MsgMR* msg_mr = GetOneSendMsgMRFromBuf();
   msg_mr->set_msg(msg);
@@ -146,6 +169,23 @@ void IBVerbsQP::ReadDone(WorkRequestId* wr_id) {
     // Global<CommNet>::Get()->ReadDone(wr_id->read_id);
     DeleteWorkRequestId(wr_id);
   }
+}
+
+void IBVerbsQP::WriteDone(WorkRequestId* wr_id) {
+  WritePartial* write_partial = wr_id->write_partial;
+  Msg msg;
+  msg.msg_type = MsgType::PartialWriteDone;
+  PartialWriteDone partial_write_done;
+  partial_write_done.data_size = write_partial->data_size;
+  partial_write_done.src_machine_id = write_partial->src_machine_id;
+  partial_write_done.dst_machine_id = write_partial->dst_machine_id;
+  partial_write_done.buffer_id = write_partial->buffer_id;
+  partial_write_done.dst_addr = write_partial->dst_addr;
+  partial_write_done.piece_id = write_partial->piece_id;
+  partial_write_done.total_piece_num = write_partial->total_piece_num;
+  msg.partial_write_done = partial_write_done;
+  Global<IBVerbsCommNet>::Get()->SendMsg(write_partial->dst_machine_id, msg);
+  DeleteWorkRequestId(wr_id);
 }
 
 void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
@@ -181,6 +221,17 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id, Channel<Msg>* msg_channel) {
       do_write.dst_machine_id = recv_msg.please_write.dst_machine_id;
       msg.do_write = do_write; 
       msg_channel->Send(msg);
+      break;
+    }
+    case (MsgType::PartialWriteDone): {
+      Global<IBVerbsCommNet>::Get()->Register2NormalMemory(recv_msg);
+      break;
+    }
+    case (MsgType::FreeBufferPair): {
+      int64_t src_machine_id = recv_msg.free_buffer_pair.src_machine_id;
+      int64_t dst_machine_id = recv_msg.free_buffer_pair.dst_machine_id;
+      int buffer_id = recv_msg.free_buffer_pair.buffer_id;
+      Global<IBVerbsCommNet>::Get()->ReleaseBuffer(src_machine_id, dst_machine_id, buffer_id); 
       break;
     }
     default: {

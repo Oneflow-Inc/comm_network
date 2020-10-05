@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
 		action_channel->Send(msg);
 	}
 	Global<IBVerbsCommNet>::Get()->RegisterFixNumMemory();
-	Global<IBVerbsCommNet>::Get()->RegisterMemoryDone();
+	void* data;
 
 	std::thread action_poller = std::thread([&]() {
 		Msg msg;
@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
 					size_t data_size = msg.allocate_memory.data_size;
 					int64_t src_machine_id = msg.allocate_memory.src_machine_id;
 					void* src_addr = msg.allocate_memory.src_addr;
-					void* data = malloc(data_size);	
+					data = malloc(data_size);	
 					Msg new_msg;
 					new_msg.msg_type = MsgType::PleaseWrite;
 					PleaseWrite please_write;
@@ -95,7 +95,12 @@ int main(int argc, char* argv[]) {
 					Global<IBVerbsCommNet>::Get()->AsyncWrite(src_machine_id, dst_machine_id, src_addr, dst_addr, data_size);
 					break;
 				}
-				case(MsgType::FreeBufferPair): {
+				case(MsgType::ReadDone): {
+					int* result = static_cast<int*>(data);
+					for (int i = 0; i < 100;i++) {
+						std::cout << result[i] << " ";
+					}
+					std::cout << std::endl;
 					break;
 				}
 				default: {

@@ -30,6 +30,7 @@ struct WorkRequestId {
   int32_t outstanding_sge_cnt;
   void* read_id;
   MsgMR* msg_mr;
+  WritePartial* write_partial;
 };
 
 class IBVerbsQP final {
@@ -45,9 +46,12 @@ class IBVerbsQP final {
 
   void PostReadRequest(const IBVerbsMemDescProto& remote_mem, const IBVerbsMemDesc& local_mem,
                        void* read_id);
+  void PostWriteRequest(const IBVerbsMemDescProto& remote_mem, const IBVerbsMemDesc& local_mem,
+                        WritePartial* write_partial);
   void PostSendRequest(const Msg& msg);
 
   void ReadDone(WorkRequestId*);
+  void WriteDone(WorkRequestId*);
   void SendDone(WorkRequestId*);
   void RecvDone(WorkRequestId*, Channel<Msg>*);
 
