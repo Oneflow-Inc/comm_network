@@ -8,7 +8,7 @@ namespace comm_network {
 
 class CtrlServer {
  public:
-  CtrlServer(int32_t ctrl_port);
+  CtrlServer();
   ~CtrlServer();
   const std::string& this_machine_addr() { return this_machine_addr_; }
 

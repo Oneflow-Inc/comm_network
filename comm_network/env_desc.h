@@ -3,9 +3,8 @@
 #include "comm_network/utils.h"
 
 namespace comm_network {
-static const size_t kMB = 1024 * 1024;
-static const int num_of_register_buffer = 4;
-static const size_t buffer_size = 4 * kMB;
+const int num_of_register_buffer = 4;
+const size_t buffer_size = 4 * 1024 * 1024;
 
 class EnvDesc {
  public:

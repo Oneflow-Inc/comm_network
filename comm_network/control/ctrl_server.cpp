@@ -1,11 +1,13 @@
 #include <grpc++/alarm.h>
 #include "comm_network/control/ctrl_server.h"
+#include "comm_network/env_desc.h"
 
 namespace comm_network {
 
-CtrlServer::CtrlServer(int32_t ctrl_port) : is_first_connect_(true), this_machine_addr_("") {
+CtrlServer::CtrlServer() : is_first_connect_(true), this_machine_addr_("") {
   Init();
-  std::string server_address("0.0.0.0:" + std::to_string(ctrl_port));
+  int port = Global<EnvDesc>::Get()->ctrl_port();
+  std::string server_address("0.0.0.0:" + std::to_string(port));
   grpc::ServerBuilder server_builder;
   server_builder.SetMaxMessageSize(INT_MAX);
   int bound_port = 0;
@@ -14,7 +16,7 @@ CtrlServer::CtrlServer(int32_t ctrl_port) : is_first_connect_(true), this_machin
   server_builder.RegisterService(grpc_service_.get());
   cq_ = server_builder.AddCompletionQueue();
   grpc_server_ = server_builder.BuildAndStart();
-  CHECK_EQ(ctrl_port, bound_port) << "Port " << ctrl_port << " is unavailable";
+  CHECK_EQ(port, bound_port) << "Port " << port << " is unavailable";
   LOG(INFO) << "CtrlServer listening on " << server_address;
   loop_thread_ = std::thread(&CtrlServer::HandleRpcs, this);
 }

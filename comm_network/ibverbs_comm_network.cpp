@@ -24,8 +24,8 @@ std::string GenRegisterRecvMemoryKey(int64_t src_machine_id, int64_t dst_machine
 
 IBVerbsCommNet::IBVerbsCommNet(Channel<Msg> *action_channel)
     : poll_exit_flag_(ATOMIC_FLAG_INIT), action_channel_(action_channel) {
-  int64_t total_machine_num = Global<CtrlClient>::Get()->env_desc()->TotalMachineNum();
-  this_machine_id_ = Global<CtrlClient>::Get()->env_desc()->GetMachineId(Global<CtrlServer>::Get()->this_machine_addr());
+  int64_t total_machine_num = Global<EnvDesc>::Get()->TotalMachineNum();
+  this_machine_id_ = Global<EnvDesc>::Get()->GetMachineId(Global<CtrlServer>::Get()->this_machine_addr());
   mem_desc_list_.resize(total_machine_num);
   for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id_) { continue; }

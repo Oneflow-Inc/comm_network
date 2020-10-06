@@ -4,13 +4,13 @@ namespace comm_network {
 const int32_t max_retry_num = 60;
 const int64_t sleep_seconds = 10;
 
-CtrlClient::CtrlClient(const EnvDesc* env_desc) : env_desc_(env_desc) {
-  stubs_.reserve(env_desc->TotalMachineNum());
+CtrlClient::CtrlClient() {
+  stubs_.reserve(Global<EnvDesc>::Get()->TotalMachineNum());
   int32_t port = -1;
   std::string addr = "";
-  for (int64_t i = 0; i < env_desc->TotalMachineNum(); i++) {
-    const Machine& mchn = env_desc->machine(i);
-    port = (mchn.ctrl_port_agent() != -1) ? (mchn.ctrl_port_agent()) : env_desc->ctrl_port();
+  for (int64_t i = 0; i < Global<EnvDesc>::Get()->TotalMachineNum(); i++) {
+    const Machine& mchn = Global<EnvDesc>::Get()->machine(i);
+    port = (mchn.ctrl_port_agent() != -1) ? (mchn.ctrl_port_agent()) : Global<EnvDesc>::Get()->ctrl_port();
     addr = mchn.addr() + ":" + std::to_string(port);
     grpc::ChannelArguments ch_args;
     ch_args.SetInt(GRPC_ARG_MAX_MESSAGE_LENGTH, 64 * 1024 * 1024);
@@ -43,7 +43,7 @@ void CtrlClient::LoadServer(const std::string& server_addr, CtrlService::Stub* s
 }
 
 CtrlService::Stub* CtrlClient::GetResponsibleStub(const std::string& key) {
-  int64_t machine_id = (std::hash<std::string>{}(key)) % env_desc_->TotalMachineNum();
+  int64_t machine_id = (std::hash<std::string>{}(key)) % Global<EnvDesc>::Get()->TotalMachineNum();
   return stubs_[machine_id].get();
 }
 
