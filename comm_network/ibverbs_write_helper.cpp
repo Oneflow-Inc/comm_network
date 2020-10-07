@@ -10,7 +10,8 @@ IBVerbsWriteHelper::~IBVerbsWriteHelper() {
   // msg_queue_.Close();
 }
 
-// void IBVerbsWriteHelper::AddWork(IBVerbsQP* qp, char* src_addr, char* dst_addr, size_t data_size) {
+// void IBVerbsWriteHelper::AddWork(IBVerbsQP* qp, char* src_addr, char* dst_addr, size_t data_size)
+// {
 //   WritePartial write_partial;
 //   write_partial.qp = qp;
 //   write_partial.src_addr = src_addr;
@@ -27,12 +28,14 @@ IBVerbsWriteHelper::~IBVerbsWriteHelper() {
 //     bool has_free = false;
 //     std::string send_key, recv_key;
 //     do {
-//       has_free = Global<IBVerbsCommNet>::Get()->FindAvailSendMemory(src_machine_id, dst_machine_id, send_key, recv_key); 
+//       has_free = Global<IBVerbsCommNet>::Get()->FindAvailSendMemory(src_machine_id,
+//       dst_machine_id, send_key, recv_key);
 //     } while (!has_free);
 //     IBVerbsMemDesc* send_mem_desc = Global<IBVerbsCommNet>::Get()->mem_desc()[send_key].first;
-//     IBVerbsMemDescProto recv_mem_desc_proto = Global<IBVerbsCommNet>::Get()->mem_desc_list()[dst_machine_id][recv_key];
-    
+//     IBVerbsMemDescProto recv_mem_desc_proto =
+//     Global<IBVerbsCommNet>::Get()->mem_desc_list()[dst_machine_id][recv_key];
+
 //   }
 // }
 
-}
+}  // namespace comm_network

@@ -1,7 +1,5 @@
 #pragma once
 
 namespace comm_network {
-class IBVerbsReadHelper {
-
-};
-}
+class IBVerbsReadHelper {};
+}  // namespace comm_network

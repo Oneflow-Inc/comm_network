@@ -22,12 +22,7 @@ CtrlServer::CtrlServer() : is_first_connect_(true), this_machine_addr_("") {
 }
 
 void CtrlServer::HandleRpcs() {
-  LoadServerEnqueueRequest();
-  PushKVEnqueueRequest();
-  PullKVEnqueueRequest();
-  BarrierEnqueueRequest();
-  ClearKVEnqueueRequest();
-
+  EnqueueRequests();
   void* tag = nullptr;
   bool ok = false;
   bool is_shutdown = false;
@@ -55,48 +50,8 @@ CtrlServer::~CtrlServer() {
   loop_thread_.join();
 }
 
-void CtrlServer::LoadServerEnqueueRequest() {
-  auto handler = std::get<0>(handlers_);
-  auto call = new CtrlCall<CtrlMethod::kLoadServer>();
-  call->set_request_handler(std::bind(handler, call));
-  grpc_service_->RequestLoadServer(call->mut_server_ctx(), call->mut_request(),
-                                   call->mut_responder(), cq_.get(), cq_.get(), call);
-}
-
-void CtrlServer::PushKVEnqueueRequest() {
-  auto handler = std::get<1>(handlers_);
-  auto call = new CtrlCall<CtrlMethod::kPushKV>();
-  call->set_request_handler(std::bind(handler, call));
-  grpc_service_->RequestPushKV(call->mut_server_ctx(), call->mut_request(), call->mut_responder(),
-                               cq_.get(), cq_.get(), call);
-}
-
-void CtrlServer::PullKVEnqueueRequest() {
-  auto handler = std::get<2>(handlers_);
-  auto call = new CtrlCall<CtrlMethod::kPullKV>();
-  call->set_request_handler(std::bind(handler, call));
-  grpc_service_->RequestPullKV(call->mut_server_ctx(), call->mut_request(), call->mut_responder(),
-                               cq_.get(), cq_.get(), call);
-}
-
-void CtrlServer::BarrierEnqueueRequest() {
-  auto handler = std::get<3>(handlers_);
-  auto call = new CtrlCall<CtrlMethod::kBarrier>();
-  call->set_request_handler(std::bind(handler, call));
-  grpc_service_->RequestBarrier(call->mut_server_ctx(), call->mut_request(), call->mut_responder(),
-                                cq_.get(), cq_.get(), call);
-}
-
-void CtrlServer::ClearKVEnqueueRequest() {
-  auto handler = std::get<4>(handlers_);
-  auto call = new CtrlCall<CtrlMethod::kClearKV>();
-  call->set_request_handler(std::bind(handler, call));
-  grpc_service_->RequestClearKV(call->mut_server_ctx(), call->mut_request(), call->mut_responder(),
-                                cq_.get(), cq_.get(), call);
-}
-
 void CtrlServer::Init() {
-  const auto& bind_load_server_func = ([this](CtrlCall<CtrlMethod::kLoadServer>* call) {
+  Add([this](CtrlCall<CtrlMethod::kLoadServer>* call) {
     if (this->is_first_connect_) {
       this->this_machine_addr_ = call->request().addr();
       this->is_first_connect_ = false;
@@ -104,43 +59,10 @@ void CtrlServer::Init() {
       CHECK_EQ(call->request().addr(), this->this_machine_addr_);
     }
     call->SendResponse();
-    LoadServerEnqueueRequest();
-    // EnqueueRequest<CtrlMethod::kLoadServer>();
+    EnqueueRequest<CtrlMethod::kLoadServer>();
   });
-  std::get<0>(handlers_) = bind_load_server_func;
 
-  const auto& bind_pushkv_func = ([this](CtrlCall<CtrlMethod::kPushKV>* call) {
-    const std::string& k = call->request().key();
-    const std::string& v = call->request().val();
-    CHECK(kv_.emplace(k, v).second);
-    auto pending_kv_calls_it = pending_kv_calls_.find(k);
-    if (pending_kv_calls_it != pending_kv_calls_.end()) {
-      for (auto pending_call : pending_kv_calls_it->second) {
-        pending_call->mut_response()->set_val(v);
-        pending_call->SendResponse();
-      }
-      pending_kv_calls_.erase(pending_kv_calls_it);
-    }
-    call->SendResponse();
-    PushKVEnqueueRequest();
-    // EnqueueRequest<CtrlMethod::kPushKV>();
-  });
-  std::get<1>(handlers_) = bind_pushkv_func;
-
-  const auto& bind_pullkv_func = ([this](CtrlCall<CtrlMethod::kPullKV>* call) {
-    const std::string& k = call->request().key();
-    auto kv_it = kv_.find(k);
-    if (kv_it != kv_.end()) {
-      call->mut_response()->set_val(kv_it->second);
-      call->SendResponse();
-    } else {
-      pending_kv_calls_[k].push_back(call);
-    }
-    PullKVEnqueueRequest();
-  });
-  std::get<2>(handlers_) = bind_pullkv_func;
-
-  const auto& bind_barrier_func = ([this](CtrlCall<CtrlMethod::kBarrier>* call) {
+  Add([this](CtrlCall<CtrlMethod::kBarrier>* call) {
     const std::string& barrier_name = call->request().name();
     int32_t barrier_num = call->request().num();
     auto barrier_call_it = barrier_calls_.find(barrier_name);
@@ -158,20 +80,46 @@ void CtrlServer::Init() {
       }
       barrier_calls_.erase(barrier_call_it);
     }
-    BarrierEnqueueRequest();
-    // EnqueueRequest<CtrlMethod::kBarrier>();
-  });
-  std::get<3>(handlers_) = bind_barrier_func;
 
-  const auto& bind_clearkv_func = ([this](CtrlCall<CtrlMethod::kClearKV>* call) {
+    EnqueueRequest<CtrlMethod::kBarrier>();
+  });
+
+  Add([this](CtrlCall<CtrlMethod::kPushKV>* call) {
+    const std::string& k = call->request().key();
+    const std::string& v = call->request().val();
+    CHECK(kv_.emplace(k, v).second);
+
+    auto pending_kv_calls_it = pending_kv_calls_.find(k);
+    if (pending_kv_calls_it != pending_kv_calls_.end()) {
+      for (auto pending_call : pending_kv_calls_it->second) {
+        pending_call->mut_response()->set_val(v);
+        pending_call->SendResponse();
+      }
+      pending_kv_calls_.erase(pending_kv_calls_it);
+    }
+    call->SendResponse();
+    EnqueueRequest<CtrlMethod::kPushKV>();
+  });
+
+  Add([this](CtrlCall<CtrlMethod::kClearKV>* call) {
     const std::string& k = call->request().key();
     CHECK_EQ(kv_.erase(k), 1);
     CHECK(pending_kv_calls_.find(k) == pending_kv_calls_.end());
     call->SendResponse();
-    ClearKVEnqueueRequest();
-    // EnqueueRequest<CtrlMethod::kClearKV>();
+    EnqueueRequest<CtrlMethod::kClearKV>();
   });
-  std::get<4>(handlers_) = bind_clearkv_func;
+
+  Add([this](CtrlCall<CtrlMethod::kPullKV>* call) {
+    const std::string& k = call->request().key();
+    auto kv_it = kv_.find(k);
+    if (kv_it != kv_.end()) {
+      call->mut_response()->set_val(kv_it->second);
+      call->SendResponse();
+    } else {
+      pending_kv_calls_[k].push_back(call);
+    }
+    EnqueueRequest<CtrlMethod::kPullKV>();
+  });
 }
 
 }  // namespace comm_network

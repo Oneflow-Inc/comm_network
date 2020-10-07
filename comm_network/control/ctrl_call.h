@@ -1,13 +1,11 @@
 #pragma once
-#include <grpcpp/grpcpp.h>
-#include "comm_network/control/control.grpc.pb.h"
-#include "comm_network/utils.h"
+#include "comm_network/control/ctrl_service.h"
 
 namespace comm_network {
 
 class CtrlCallIf {
  public:
-  DISALLOW_COPY_AND_MOVE(CtrlCallIf);
+  CN_DISALLOW_COPY_AND_MOVE(CtrlCallIf);
   virtual ~CtrlCallIf() = default;
 
   virtual void Process() = 0;
@@ -17,26 +15,14 @@ class CtrlCallIf {
   CtrlCallIf() = default;
 };
 
-enum class CtrlMethod { kLoadServer, kPushKV, kPullKV, kBarrier, kClearKV };
-using CtrlRequestTuple =
-    std::tuple<LoadServerRequest, PushKVRequest, PullKVRequest, BarrierRequest, ClearKVRequest>;
-using CtrlResponseTuple = std::tuple<LoadServerResponse, PushKVResponse, PullKVResponse,
-                                     BarrierResponse, ClearKVResponse>;
-
-template<CtrlMethod ctrl_method>
-using CtrlRequest =
-    typename std::tuple_element<static_cast<size_t>(ctrl_method), CtrlRequestTuple>::type;
-
-template<CtrlMethod ctrl_method>
-using CtrlResponse =
-    typename std::tuple_element<static_cast<size_t>(ctrl_method), CtrlResponseTuple>::type;
-
 template<CtrlMethod ctrl_method>
 class CtrlCall final : public CtrlCallIf {
  public:
-  DISALLOW_COPY_AND_MOVE(CtrlCall);
+  CN_DISALLOW_COPY_AND_MOVE(CtrlCall);
   CtrlCall() : status_(Status::kBeforeHandleRequest), responder_(&server_ctx_) {}
   ~CtrlCall() = default;
+
+  static constexpr const size_t value = (size_t)ctrl_method;
 
   const CtrlRequest<ctrl_method>& request() const { return request_; }
   CtrlRequest<ctrl_method>* mut_request() { return &request_; }
@@ -46,6 +32,7 @@ class CtrlCall final : public CtrlCallIf {
     return &responder_;
   }
   void set_request_handler(std::function<void()> val) { request_handler_ = val; }
+
   void Process() override {
     switch (status_) {
       case Status::kBeforeHandleRequest: {
@@ -66,6 +53,7 @@ class CtrlCall final : public CtrlCallIf {
 
  private:
   enum class Status { kBeforeHandleRequest, kBeforeDelete };
+
   Status status_;
   CtrlRequest<ctrl_method> request_;
   CtrlResponse<ctrl_method> response_;
@@ -73,4 +61,5 @@ class CtrlCall final : public CtrlCallIf {
   grpc::ServerAsyncResponseWriter<CtrlResponse<ctrl_method>> responder_;
   std::function<void()> request_handler_;
 };
+
 }  // namespace comm_network

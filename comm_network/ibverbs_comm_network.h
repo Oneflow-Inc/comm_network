@@ -10,19 +10,25 @@
 namespace comm_network {
 class IBVerbsCommNet final {
  public:
-  DISALLOW_COPY_AND_MOVE(IBVerbsCommNet);
-  IBVerbsCommNet(Channel<Msg> *action_channel);
+  CN_DISALLOW_COPY_AND_MOVE(IBVerbsCommNet);
+  IBVerbsCommNet(Channel<Msg>* action_channel);
   ~IBVerbsCommNet();
 
   const std::unordered_set<int64_t>& peer_machine_id() { return peer_machine_id_; }
   void RegisterFixNumMemory();
   void UnRegisterFixNumMemory();
 
-  bool FindAvailSendMemory(int64_t src_machine_id, int64_t dst_machine_id, std::string& send_key, std::string& recv_key, int& buffer_id);
-  const std::unordered_map<std::string, std::pair<IBVerbsMemDesc*, bool>>& mem_desc() { return mem_desc_; }
-  const std::vector<std::unordered_map<std::string, IBVerbsMemDescProto>> mem_desc_list() { return mem_desc_list_; }
+  bool FindAvailSendMemory(int64_t src_machine_id, int64_t dst_machine_id, std::string& send_key,
+                           std::string& recv_key, int& buffer_id);
+  const std::unordered_map<std::string, std::pair<IBVerbsMemDesc*, bool>>& mem_desc() {
+    return mem_desc_;
+  }
+  const std::vector<std::unordered_map<std::string, IBVerbsMemDescProto>> mem_desc_list() {
+    return mem_desc_list_;
+  }
 
-	void AsyncWrite(int64_t src_machine_id, int64_t dst_machine_id, void* src_addr, void* dst_addr, size_t data_size);
+  void AsyncWrite(int64_t src_machine_id, int64_t dst_machine_id, void* src_addr, void* dst_addr,
+                  size_t data_size);
   void AddReadCallBack(void* read_id, std::function<void()> callback);
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
   void Register2NormalMemory(const Msg& recv_msg);
@@ -43,11 +49,11 @@ class IBVerbsCommNet final {
   std::thread poll_channel_thread_;
   Channel<WritePartial> write_channel_;
   std::atomic_flag poll_exit_flag_;
-  Channel<Msg> *action_channel_;
+  Channel<Msg>* action_channel_;
   int64_t this_machine_id_;
-  std::unordered_map<std::string, std::pair<IBVerbsMemDesc*, bool>> mem_desc_; 
+  std::unordered_map<std::string, std::pair<IBVerbsMemDesc*, bool>> mem_desc_;
   std::vector<std::unordered_map<std::string, IBVerbsMemDescProto>> mem_desc_list_;
   IBVerbsReadHelper* read_helper_;
-  IBVerbsWriteHelper* write_helper_; 
+  IBVerbsWriteHelper* write_helper_;
 };
 }  // namespace comm_network

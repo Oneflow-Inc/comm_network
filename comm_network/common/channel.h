@@ -1,6 +1,6 @@
 #pragma once
 
-#include "comm_network/utils.h"
+#include "comm_network/common/utils.h"
 
 namespace comm_network {
 
@@ -9,7 +9,7 @@ enum ChannelStatus { kChannelStatusSuccess = 0, kChannelStatusErrorClosed };
 template<typename T>
 class Channel final {
  public:
-  DISALLOW_COPY_AND_MOVE(Channel);
+  CN_DISALLOW_COPY_AND_MOVE(Channel);
   Channel() : is_closed_(false) {}
   ~Channel() = default;
 
@@ -63,5 +63,4 @@ void Channel<T>::Close() {
   cond_.notify_all();
 }
 
-}
-
+}  // namespace comm_network

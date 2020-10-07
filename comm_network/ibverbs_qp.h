@@ -1,12 +1,12 @@
 #pragma once
 #include "comm_network/ibverbs_memory_desc.h"
 #include "comm_network/message.h"
-#include "comm_network/channel.h"
+#include "comm_network/common/channel.h"
 
 namespace comm_network {
 class MsgMR final {
  public:
-  DISALLOW_COPY_AND_MOVE(MsgMR);
+  CN_DISALLOW_COPY_AND_MOVE(MsgMR);
   MsgMR() = delete;
   MsgMR(ibv_pd* pd) {
     mem_desc_.reset(new IBVerbsMemDesc(pd, &msg_, sizeof(msg_)));
@@ -35,7 +35,7 @@ struct WorkRequestId {
 
 class IBVerbsQP final {
  public:
-  DISALLOW_COPY_AND_MOVE(IBVerbsQP);
+  CN_DISALLOW_COPY_AND_MOVE(IBVerbsQP);
   IBVerbsQP() = delete;
   IBVerbsQP(ibv_context*, ibv_pd*, ibv_cq* send_cq, ibv_cq* recv_cq);
   ~IBVerbsQP();

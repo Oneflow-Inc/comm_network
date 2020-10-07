@@ -1,6 +1,6 @@
 #pragma once
-#include "comm_network/utils.h"
-#include "comm_network/channel.h"
+#include "comm_network/common/utils.h"
+#include "comm_network/common/channel.h"
 
 namespace comm_network {
 class IBVerbsWriteHelper {
@@ -13,10 +13,10 @@ class IBVerbsWriteHelper {
   //   char* src_addr;
   //   char* dst_addr;
   //   size_t data_size;
-  //   IBVerbsQP* qp; 
+  //   IBVerbsQP* qp;
   // };
   // void PollQueue();
   // Channel<WritePartial> msg_queue_;
   // std::thread thread_;
 };
-}
+}  // namespace comm_network

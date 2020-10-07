@@ -1,7 +1,7 @@
 include(ExternalProject)
 include(GNUInstallDirs)
-set (PROTOBUF_TAR_URL "https://github.com/protocolbuffers/protobuf/releases/download/v3.13.0/protobuf-cpp-3.13.0.tar.gz")
-set (PROTOBUF_URL_HASH "6425d7466db2efe5a80de1e38899f317")
+set (PROTOBUF_TAR_URL "https://github.com/protocolbuffers/protobuf/releases/download/v3.9.2/protobuf-cpp-3.9.2.tar.gz")
+set (PROTOBUF_URL_HASH "408f1eb63156ec4bab9db1a5f6db3edc")
 set (PROTOBUF_SRC ${THIRD_PARTY_DIR}/protobuf)
 
 ExternalProject_Add(protobuf

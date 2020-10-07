@@ -33,4 +33,4 @@ class Global final {
     }
   }
 };
-}
+}  // namespace comm_network
