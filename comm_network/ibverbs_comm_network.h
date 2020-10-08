@@ -27,7 +27,6 @@ class IBVerbsCommNet final {
 
   void AsyncWrite(int64_t src_machine_id, int64_t dst_machine_id, void* src_addr, void* dst_addr,
                   size_t data_size);
-  void AddReadCallBack(void* read_id, std::function<void()> callback);
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
   void Register2NormalMemory(const Msg& recv_msg);
   void ReleaseBuffer(int64_t src_machine_id, int64_t dst_machine_id, int8_t buffer_id);

@@ -28,7 +28,6 @@ class IBVerbsQP;
 struct WorkRequestId {
   IBVerbsQP* qp;
   int32_t outstanding_sge_cnt;
-  void* read_id;
   MsgMR* msg_mr;
   Msg msg_write_partial;
 };

@@ -230,7 +230,6 @@ WorkRequestId* IBVerbsQP::NewWorkRequestId() {
   WorkRequestId* wr_id = new WorkRequestId;
   wr_id->qp = this;
   wr_id->outstanding_sge_cnt = 0;
-  wr_id->read_id = nullptr;
   wr_id->msg_mr = nullptr;
   return wr_id;
 }

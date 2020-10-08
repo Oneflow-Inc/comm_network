@@ -61,7 +61,7 @@ void HandleActions(Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_ne
 			}
 			case(MsgType::kReadDone): {
 				int* result = reinterpret_cast<int*>(data);
-				for (int i = 0; i < 100;i++) {
+				for (int i = 8 * 1024 * 1024; i < 8 * 1024 * 1024 + 100;i++) {
 					std::cout << result[i] << " ";
 				}
 				std::cout << std::endl;
