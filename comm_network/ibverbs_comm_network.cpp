@@ -13,12 +13,12 @@ std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
   return "IBVerbsConnInfo/" + std::to_string(src_machine_id) + "/" + std::to_string(dst_machine_id);
 }
 
-std::string GenRegisterSendMemoryKey(int64_t src_machine_id, int64_t dst_machine_id, int64_t idx) {
+std::string GenRegisterSendMemoryKey(int64_t src_machine_id, int64_t dst_machine_id, int8_t idx) {
   return "IBVerbsSendMemory/" + std::to_string(src_machine_id) + "/"
          + std::to_string(dst_machine_id) + "/" + std::to_string(idx);
 }
 
-std::string GenRegisterRecvMemoryKey(int64_t src_machine_id, int64_t dst_machine_id, int64_t idx) {
+std::string GenRegisterRecvMemoryKey(int64_t src_machine_id, int64_t dst_machine_id, int8_t idx) {
   return "IBVerbsRecvMemory/" + std::to_string(src_machine_id) + "/"
          + std::to_string(dst_machine_id) + "/" + std::to_string(idx);
 }
@@ -29,6 +29,7 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel)
   this_machine_id_ =
       Global<EnvDesc>::Get()->GetMachineId(Global<CtrlServer>::Get()->this_machine_addr());
   mem_desc_list_.resize(total_machine_num);
+  idle_buffer_queue_.resize(total_machine_num);
   for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id_) { continue; }
     peer_machine_id_.insert(i);
@@ -74,8 +75,6 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel)
   BARRIER();
   poll_thread_ = std::thread(&IBVerbsCommNet::PollCQ, this);
   BARRIER();
-  read_helper_ = new IBVerbsReadHelper();
-  write_helper_ = new IBVerbsWriteHelper();
   poll_channel_thread_ = std::thread(&IBVerbsCommNet::PollQueue, this);
 }
 
@@ -91,10 +90,6 @@ void IBVerbsCommNet::PollCQ() {
       WorkRequestId* wr_id = reinterpret_cast<WorkRequestId*>(wc.wr_id);
       IBVerbsQP* qp = wr_id->qp;
       switch (wc.opcode) {
-        case IBV_WC_RDMA_READ: {
-          qp->ReadDone(wr_id);
-          break;
-        }
         case IBV_WC_SEND: {
           qp->SendDone(wr_id);
           break;
@@ -117,36 +112,40 @@ void IBVerbsCommNet::PollCQ() {
 }
 
 void IBVerbsCommNet::PollQueue() {
-  WritePartial write_partial;
-  while (write_channel_.Receive(&write_partial) == kChannelStatusSuccess) {
-    int64_t src_machine_id = write_partial.src_machine_id;
-    int64_t dst_machine_id = write_partial.dst_machine_id;
-    bool has_free = false;
-    std::string send_key, recv_key;
-    int buffer_id;
-    do {
-      has_free = FindAvailSendMemory(src_machine_id, dst_machine_id, send_key, recv_key, buffer_id);
-    } while (!has_free);
+  Msg msg;
+  while (write_channel_.Receive(&msg) == kChannelStatusSuccess) {
+    int64_t src_machine_id = msg.msg_body.src_machine_id;
+    int64_t dst_machine_id = msg.msg_body.dst_machine_id;
+    // Check for free buffer condition wait if no buffer resource
+    std::string send_key = "";
+    {
+      std::unique_lock<std::mutex> lock(idle_buffer_queue_mtx_);
+      while (idle_buffer_queue_[dst_machine_id].empty()) {
+        idle_buffer_queue_cv_.wait(lock);
+      }
+      send_key = idle_buffer_queue_[dst_machine_id].front();
+      idle_buffer_queue_[dst_machine_id].pop();
+    }
+    CHECK(send_key != "");
+    int8_t buffer_id = send_key.back() - '0';
+    std::string recv_key = GenRegisterRecvMemoryKey(src_machine_id, dst_machine_id, buffer_id);
     IBVerbsMemDesc* send_mem_desc = mem_desc_[send_key].first;
     IBVerbsMemDescProto recv_mem_desc_proto = mem_desc_list_[dst_machine_id][recv_key];
-    LOG(INFO) << send_key << " " << recv_key;
     LOG(INFO) << "Write from " << src_machine_id << " to " << dst_machine_id
-              << " bytes: " << write_partial.data_size;
+              << " bytes: " << msg.msg_body.data_size << " using buffer " << send_key;
     // copy normal memory to register memory
     ibv_sge cur_sge = send_mem_desc->sge_vec().at(0);
-    memcpy(reinterpret_cast<void*>(cur_sge.addr), write_partial.src_addr, write_partial.data_size);
+    memcpy(reinterpret_cast<void*>(cur_sge.addr), msg.msg_body.src_addr, msg.msg_body.data_size);
     // write immediately
-    write_partial.buffer_id = buffer_id;
+    msg.msg_body.buffer_id = buffer_id;
     qp_vec_.at(dst_machine_id)
-        ->PostWriteRequest(recv_mem_desc_proto, *send_mem_desc, &write_partial);
+        ->PostWriteRequest(recv_mem_desc_proto, *send_mem_desc, msg);
   }
 }
 
 IBVerbsCommNet::~IBVerbsCommNet() {
   while (poll_exit_flag_.test_and_set() == true) {}
   poll_thread_.join();
-  delete read_helper_;
-  delete write_helper_;
   write_channel_.Close();
   poll_channel_thread_.join();
   for (IBVerbsQP* qp : qp_vec_) {
@@ -167,19 +166,19 @@ void IBVerbsCommNet::AsyncWrite(int64_t src_machine_id, int64_t dst_machine_id, 
   char* src_ptr = reinterpret_cast<char*>(src_addr);
   char* dst_ptr = reinterpret_cast<char*>(dst_addr);
   int piece_id = 0;
-  int total_piece_num = (data_size - 1) / buffer_size + 1;
-  LOG(INFO) << "total piece num " << total_piece_num;
+  int num_of_pieces = (data_size - 1) / buffer_size + 1;
+  LOG(INFO) << "total piece num " << num_of_pieces;
   while (size < data_size) {
     size_t transfer_size = std::min(data_size - size, buffer_size);
-    WritePartial write_partial;
-    write_partial.src_machine_id = src_machine_id;
-    write_partial.dst_machine_id = dst_machine_id;
-    write_partial.src_addr = src_ptr;
-    write_partial.dst_addr = dst_ptr;
-    write_partial.data_size = transfer_size;
-    write_partial.piece_id = piece_id;
-    write_partial.total_piece_num = total_piece_num;
-    write_channel_.Send(write_partial);
+    Msg msg;
+    msg.msg_body.src_machine_id = src_machine_id;
+    msg.msg_body.dst_machine_id = dst_machine_id;
+    msg.msg_body.src_addr = reinterpret_cast<void*>(src_ptr);
+    msg.msg_body.dst_addr = reinterpret_cast<void*>(dst_ptr);
+    msg.msg_body.data_size = transfer_size;
+    msg.msg_body.piece_id = piece_id;
+    msg.msg_body.num_of_pieces = num_of_pieces;
+    write_channel_.Send(msg);
     size += transfer_size;
     src_ptr += transfer_size;
     dst_ptr += transfer_size;
@@ -190,10 +189,11 @@ void IBVerbsCommNet::AsyncWrite(int64_t src_machine_id, int64_t dst_machine_id, 
 void IBVerbsCommNet::Register2NormalMemory(const Msg& msg) {
   int64_t src_machine_id = msg.msg_body.src_machine_id;
   int64_t dst_machine_id = msg.msg_body.dst_machine_id;
-  int buffer_id = msg.msg_body.buffer_id;
+  int8_t buffer_id = msg.msg_body.buffer_id;
   size_t data_size = msg.msg_body.data_size;
   void* dst_addr = msg.msg_body.dst_addr;
   std::string recv_key = GenRegisterRecvMemoryKey(src_machine_id, dst_machine_id, buffer_id);
+  LOG(INFO) << "Transfer " << recv_key << " to normal";
   std::string send_key = GenRegisterSendMemoryKey(src_machine_id, dst_machine_id, buffer_id);
   IBVerbsMemDesc* recv_mem_desc = mem_desc_[recv_key].first;
   ibv_sge cur_sge = recv_mem_desc->sge_vec().at(0);
@@ -214,9 +214,11 @@ void IBVerbsCommNet::Register2NormalMemory(const Msg& msg) {
   }
 }
 
-void IBVerbsCommNet::ReleaseBuffer(int64_t src_machine_id, int64_t dst_machine_id, int buffer_id) {
+void IBVerbsCommNet::ReleaseBuffer(int64_t src_machine_id, int64_t dst_machine_id, int8_t buffer_id) {
   std::string send_key = GenRegisterSendMemoryKey(src_machine_id, dst_machine_id, buffer_id);
-  mem_desc_[send_key].second = true;
+  std::unique_lock<std::mutex> lock(idle_buffer_queue_mtx_);
+  idle_buffer_queue_[dst_machine_id].push(send_key);
+  idle_buffer_queue_cv_.notify_all();
 }
 
 void* IBVerbsCommNet::RegisterMemory(std::string key, void* ptr, size_t byte_size) {
@@ -243,6 +245,7 @@ void IBVerbsCommNet::RegisterFixNumMemory() {
       RegisterMemory(recv_key, recv_buffer, buffer_size);
       this_tokens_msg.mutable_mem_desc()->insert({send_key, mem_desc_[send_key].first->ToProto()});
       this_tokens_msg.mutable_mem_desc()->insert({recv_key, mem_desc_[recv_key].first->ToProto()});
+      idle_buffer_queue_[peer_id].push(send_key);
     }
     Global<CtrlClient>::Get()->PushKV(GenTokensMsgKey(this_machine_id_, peer_id), this_tokens_msg);
   }

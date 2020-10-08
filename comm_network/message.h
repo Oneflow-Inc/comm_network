@@ -6,6 +6,7 @@ enum class MsgType {
   kPleaseWrite,
   kAllocateMemory,
   kDoWrite,
+  kDoPartialWrite,
   kPartialWriteDone,
   kFreeBufferPair,
   kReadDone
@@ -25,17 +26,6 @@ struct MsgBody {
 struct Msg {
   MsgType msg_type;
   MsgBody msg_body;
-};
-
-struct WritePartial {
-  char* src_addr;
-  char* dst_addr;
-  size_t data_size;
-  int64_t src_machine_id;
-  int64_t dst_machine_id;
-  int buffer_id;
-  int piece_id;
-  int total_piece_num;
 };
 
 }  // namespace comm_network

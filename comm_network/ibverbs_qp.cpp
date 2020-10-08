@@ -99,34 +99,12 @@ void IBVerbsQP::PostAllRecvRequest() {
   for (MsgMR* msg_mr : recv_msg_buf_) { PostRecvRequest(msg_mr); }
 }
 
-void IBVerbsQP::PostReadRequest(const IBVerbsMemDescProto& remote_mem,
-                                const IBVerbsMemDesc& local_mem, void* read_id) {
-  CHECK_EQ(remote_mem.mem_ptr_size(), local_mem.sge_vec().size());
-  WorkRequestId* wr_id = NewWorkRequestId();
-  wr_id->outstanding_sge_cnt = local_mem.sge_vec().size();
-  wr_id->read_id = read_id;
-  FOR_RANGE(size_t, i, 0, local_mem.sge_vec().size()) {
-    ibv_send_wr wr;
-    wr.wr_id = reinterpret_cast<uint64_t>(wr_id);
-    wr.next = nullptr;
-    wr.sg_list = const_cast<ibv_sge*>(&(local_mem.sge_vec().at(i)));
-    wr.num_sge = 1;
-    wr.opcode = IBV_WR_RDMA_READ;
-    wr.send_flags = 0;
-    wr.imm_data = 0;
-    wr.wr.rdma.remote_addr = remote_mem.mem_ptr(i);
-    wr.wr.rdma.rkey = remote_mem.mr_rkey(i);
-    ibv_send_wr* bad_wr = nullptr;
-    CHECK_EQ(ibv_post_send(qp_, &wr, &bad_wr), 0);
-  }
-}
-
 void IBVerbsQP::PostWriteRequest(const IBVerbsMemDescProto& remote_mem,
-                                 const IBVerbsMemDesc& local_mem, WritePartial* write_partial) {
+                                 const IBVerbsMemDesc& local_mem, const Msg& write_partial) {
   CHECK_EQ(remote_mem.mem_ptr_size(), local_mem.sge_vec().size());
   WorkRequestId* wr_id = NewWorkRequestId();
   wr_id->outstanding_sge_cnt = local_mem.sge_vec().size();
-  wr_id->write_partial = write_partial;
+  wr_id->msg_write_partial = write_partial;
   FOR_RANGE(size_t, i, 0, local_mem.sge_vec().size()) {
     ibv_send_wr wr;
     wr.wr_id = reinterpret_cast<uint64_t>(wr_id);
@@ -161,29 +139,19 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
   CHECK_EQ(ibv_post_send(qp_, &wr, &bad_wr), 0);
 }
 
-void IBVerbsQP::ReadDone(WorkRequestId* wr_id) {
-  CHECK_GE(wr_id->outstanding_sge_cnt, 1);
-  wr_id->outstanding_sge_cnt -= 1;
-  if (wr_id->outstanding_sge_cnt == 0) {
-    // Global<CommNet>::Get()->ReadDone(wr_id->read_id);
-    DeleteWorkRequestId(wr_id);
-  }
-}
-
 void IBVerbsQP::WriteDone(WorkRequestId* wr_id) {
-  WritePartial* write_partial = wr_id->write_partial;
+  Msg write_partial = wr_id->msg_write_partial;
   Msg msg;
   msg.msg_type = MsgType::kPartialWriteDone;
-  MsgBody msg_body;
-  msg_body.data_size = write_partial->data_size;
-  msg_body.src_machine_id = write_partial->src_machine_id;
-  msg_body.dst_machine_id = write_partial->dst_machine_id;
-  msg_body.buffer_id = write_partial->buffer_id;
-  msg_body.dst_addr = write_partial->dst_addr;
-  msg_body.piece_id = write_partial->piece_id;
-  msg_body.num_of_pieces = write_partial->total_piece_num;
-  msg.msg_body = msg_body;
-  Global<IBVerbsCommNet>::Get()->SendMsg(write_partial->dst_machine_id, msg);
+  LOG(INFO) << "Write Done " << write_partial.msg_body.buffer_id; 
+  msg.msg_body.data_size = write_partial.msg_body.data_size;
+  msg.msg_body.src_machine_id = write_partial.msg_body.src_machine_id;
+  msg.msg_body.dst_machine_id = write_partial.msg_body.dst_machine_id;
+  msg.msg_body.buffer_id = write_partial.msg_body.buffer_id;
+  msg.msg_body.dst_addr = write_partial.msg_body.dst_addr;
+  msg.msg_body.piece_id = write_partial.msg_body.piece_id;
+  msg.msg_body.num_of_pieces = write_partial.msg_body.num_of_pieces;
+  Global<IBVerbsCommNet>::Get()->SendMsg(write_partial.msg_body.dst_machine_id, msg);
   DeleteWorkRequestId(wr_id);
 }
 
@@ -201,24 +169,20 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id, Channel<Msg>* msg_channel) {
     case (MsgType::kDataIsReady): {
       Msg msg;
       msg.msg_type = MsgType::kAllocateMemory;
-      MsgBody msg_body;
-      msg_body.data_size = recv_msg.msg_body.data_size;
-      msg_body.src_addr = recv_msg.msg_body.src_addr;
-      msg_body.src_machine_id = recv_msg.msg_body.src_machine_id;
-      msg.msg_body = msg_body;
+      msg.msg_body.data_size = recv_msg.msg_body.data_size;
+      msg.msg_body.src_addr = recv_msg.msg_body.src_addr;
+      msg.msg_body.src_machine_id = recv_msg.msg_body.src_machine_id;
       msg_channel->Send(msg);
       break;
     }
     case (MsgType::kPleaseWrite): {
       Msg msg;
       msg.msg_type = MsgType::kDoWrite;
-      MsgBody msg_body;
-      msg_body.src_addr = recv_msg.msg_body.src_addr;
-      msg_body.dst_addr = recv_msg.msg_body.dst_addr;
-      msg_body.data_size = recv_msg.msg_body.data_size;
-      msg_body.src_machine_id = recv_msg.msg_body.src_machine_id;
-      msg_body.dst_machine_id = recv_msg.msg_body.dst_machine_id;
-      msg.msg_body = msg_body;
+      msg.msg_body.src_addr = recv_msg.msg_body.src_addr;
+      msg.msg_body.dst_addr = recv_msg.msg_body.dst_addr;
+      msg.msg_body.data_size = recv_msg.msg_body.data_size;
+      msg.msg_body.src_machine_id = recv_msg.msg_body.src_machine_id;
+      msg.msg_body.dst_machine_id = recv_msg.msg_body.dst_machine_id;
       msg_channel->Send(msg);
       break;
     }
@@ -229,7 +193,7 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id, Channel<Msg>* msg_channel) {
     case (MsgType::kFreeBufferPair): {
       int64_t src_machine_id = recv_msg.msg_body.src_machine_id;
       int64_t dst_machine_id = recv_msg.msg_body.dst_machine_id;
-      int buffer_id = recv_msg.msg_body.buffer_id;
+      int8_t buffer_id = recv_msg.msg_body.buffer_id;
       Global<IBVerbsCommNet>::Get()->ReleaseBuffer(src_machine_id, dst_machine_id, buffer_id);
       break;
     }

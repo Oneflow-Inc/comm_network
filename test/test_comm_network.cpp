@@ -46,7 +46,6 @@ void HandleActions(Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_ne
 			}
 			case(MsgType::kPleaseWrite): {
 				int64_t src_machine_id = msg.msg_body.src_machine_id;
-				std::cout << src_machine_id << std::endl;
 				ibverbs_comm_net->SendMsg(src_machine_id, msg);
 				break;
 			}
@@ -61,7 +60,7 @@ void HandleActions(Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_ne
 				break;
 			}
 			case(MsgType::kReadDone): {
-				int* result = static_cast<int*>(data);
+				int* result = reinterpret_cast<int*>(data);
 				for (int i = 0; i < 100;i++) {
 					std::cout << result[i] << " ";
 				}
@@ -86,22 +85,22 @@ int main(int argc, char* argv[]) {
 	int64_t this_machine_id = ThisMachineId();
 	std::cout << "This machine id is: " << this_machine_id << std::endl;
 	if (this_machine_id == 0) {
-		int test_data_arr[100];
-		for (int i = 0;i < 100;i++) {
+		int *test_data_arr = new int[1024 * 1024 * 16];
+		for (int i = 0;i < 1024 * 1024 * 16;i++) {
 			test_data_arr[i] = i;
 		}
 		Msg msg;
 		msg.msg_type = MsgType::kDataIsReady;
 		MsgBody msg_body;
-		msg_body.src_addr = static_cast<void*>(test_data_arr);
-		msg_body.data_size = 100 * sizeof(int);
+		msg_body.src_addr = reinterpret_cast<void*>(test_data_arr);
+		msg_body.data_size = 1024 * 1024 * 16 * sizeof(int);
 		msg_body.src_machine_id = this_machine_id;
 		msg_body.dst_machine_id = 1;
 		msg.msg_body = msg_body; 
 		action_channel.Send(msg);
 	}
 	std::thread action_poller(HandleActions, &action_channel, ibverbs_comm_net, this_machine_id);
-	sleep(10);
+	sleep(120);
 	DestroyCommNet();
 	action_channel.Close();
 	action_poller.join();
