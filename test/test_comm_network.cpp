@@ -1,5 +1,5 @@
 #include <iostream>
-#include "comm_network/comm_network_internal.h"
+#include "comm_network/comm_network.h"
 #include "comm_network/message.h"
 #include "comm_network/common/channel.h"
 
