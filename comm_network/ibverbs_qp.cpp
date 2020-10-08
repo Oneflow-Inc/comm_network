@@ -143,7 +143,7 @@ void IBVerbsQP::WriteDone(WorkRequestId* wr_id) {
   Msg write_partial = wr_id->msg_write_partial;
   Msg msg;
   msg.msg_type = MsgType::kPartialWriteDone;
-  LOG(INFO) << "Write Done " << write_partial.msg_body.buffer_id; 
+  LOG(INFO) << "Write Done " << write_partial.msg_body.buffer_id;
   msg.msg_body.data_size = write_partial.msg_body.data_size;
   msg.msg_body.src_machine_id = write_partial.msg_body.src_machine_id;
   msg.msg_body.dst_machine_id = write_partial.msg_body.dst_machine_id;

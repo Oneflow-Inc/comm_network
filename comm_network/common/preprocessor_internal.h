@@ -303,18 +303,18 @@
 // php code to generate iterator macro
 // clang-format CNf
 /*
-<?php $limit = 512; for ($i = 0; $i < $limit; ++$i) {?> 
-#define CN_PP_INTERNAL_SEQ_SIZE_<?= $i?>(_) CN_PP_INTERNAL_SEQ_SIZE_<?= $i + 1?> 
+<?php $limit = 512; for ($i = 0; $i < $limit; ++$i) {?>
+#define CN_PP_INTERNAL_SEQ_SIZE_<?= $i?>(_) CN_PP_INTERNAL_SEQ_SIZE_<?= $i + 1?>
 
 #define CN_PP_INTERNAL_SEQ_SIZE_CN_PP_INTERNAL_SEQ_SIZE_<?= $i?> <?= $i?>
 
-<?php $dim = 2; for ($d = 0; $d <= $dim; ++$d) {?> 
+<?php $dim = 2; for ($d = 0; $d <= $dim; ++$d) {?>
 #define CN_PP_INTERNAL_D<?= $d?>_SEQ_FOR_EACH_<?= $i + 1?>(apply, m, d, seq) \
   apply(m, d, CN_PP_INTERNAL_SEQ_HEAD(seq))                  \
       CN_PP_INTERNAL_D<?= $d?>_SEQ_FOR_EACH_<?= $i?>(apply, m, d, CN_PP_INTERNAL_SEQ_TAIL(seq))
-<?php }?> 
+<?php }?>
 
-<?php }?> 
+<?php }?>
 */
 // clang-format on
 
@@ -7486,4 +7486,3 @@
 #define CN_PP_INTERNAL_D2_SEQ_FOR_EACH_512(apply, m, d, seq) \
   apply(m, d, CN_PP_INTERNAL_SEQ_HEAD(seq))                  \
       CN_PP_INTERNAL_D2_SEQ_FOR_EACH_511(apply, m, d, CN_PP_INTERNAL_SEQ_TAIL(seq))
-

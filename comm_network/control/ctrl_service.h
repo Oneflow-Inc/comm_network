@@ -17,11 +17,11 @@
 namespace comm_network {
 
 #define CTRL_METHOD_SEQ            \
-  CN_PP_MAKE_TUPLE_SEQ(LoadServer)    \
-  CN_PP_MAKE_TUPLE_SEQ(Barrier)       \
-  CN_PP_MAKE_TUPLE_SEQ(PushKV)        \
-  CN_PP_MAKE_TUPLE_SEQ(ClearKV)       \
-  CN_PP_MAKE_TUPLE_SEQ(PullKV)        
+  CN_PP_MAKE_TUPLE_SEQ(LoadServer) \
+  CN_PP_MAKE_TUPLE_SEQ(Barrier)    \
+  CN_PP_MAKE_TUPLE_SEQ(PushKV)     \
+  CN_PP_MAKE_TUPLE_SEQ(ClearKV)    \
+  CN_PP_MAKE_TUPLE_SEQ(PullKV)
 
 #define CatRequest(method) method##Request,
 #define CatReqponse(method) method##Response,
@@ -79,5 +79,4 @@ class CtrlService final {
     using grpc::Service::RequestAsyncUnary;
   };
 };
-
 }

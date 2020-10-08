@@ -120,9 +120,7 @@ void IBVerbsCommNet::PollQueue() {
     std::string send_key = "";
     {
       std::unique_lock<std::mutex> lock(idle_buffer_queue_mtx_);
-      while (idle_buffer_queue_[dst_machine_id].empty()) {
-        idle_buffer_queue_cv_.wait(lock);
-      }
+      while (idle_buffer_queue_[dst_machine_id].empty()) { idle_buffer_queue_cv_.wait(lock); }
       send_key = idle_buffer_queue_[dst_machine_id].front();
       idle_buffer_queue_[dst_machine_id].pop();
     }
@@ -138,8 +136,7 @@ void IBVerbsCommNet::PollQueue() {
     memcpy(reinterpret_cast<void*>(cur_sge.addr), msg.msg_body.src_addr, msg.msg_body.data_size);
     // write immediately
     msg.msg_body.buffer_id = buffer_id;
-    qp_vec_.at(dst_machine_id)
-        ->PostWriteRequest(recv_mem_desc_proto, *send_mem_desc, msg);
+    qp_vec_.at(dst_machine_id)->PostWriteRequest(recv_mem_desc_proto, *send_mem_desc, msg);
   }
 }
 
@@ -214,7 +211,8 @@ void IBVerbsCommNet::Register2NormalMemory(const Msg& msg) {
   }
 }
 
-void IBVerbsCommNet::ReleaseBuffer(int64_t src_machine_id, int64_t dst_machine_id, int8_t buffer_id) {
+void IBVerbsCommNet::ReleaseBuffer(int64_t src_machine_id, int64_t dst_machine_id,
+                                   int8_t buffer_id) {
   std::string send_key = GenRegisterSendMemoryKey(src_machine_id, dst_machine_id, buffer_id);
   std::unique_lock<std::mutex> lock(idle_buffer_queue_mtx_);
   idle_buffer_queue_[dst_machine_id].push(send_key);

@@ -147,4 +147,4 @@ CtrlService::Stub* CtrlClient::GetResponsibleStub(const std::string& key) {
   return stubs_[machine_id].get();
 }
 
-}  // namespace comm_network 
+}  // namespace comm_network
