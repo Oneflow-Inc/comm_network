@@ -39,6 +39,8 @@ const int rdma_mem_block_num = 2;
 
 #define FOR_RANGE(type, i, begin, end) for (type i = (begin), __end = (end); i < __end; ++i)
 
+#define UNIMPLEMENTED() LOG(FATAL) << "UNIMPLEMENTED"
+
 inline uint32_t NewRandomSeed() {
   static std::mt19937 gen{std::random_device{}()};
   return gen();

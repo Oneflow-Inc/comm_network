@@ -22,53 +22,37 @@ void HandleActions(Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_ne
 	Msg msg;
 	while (action_channel->Receive(&msg) == kChannelStatusSuccess) {
 		switch (msg.msg_type) {
+			// sender machine reminds receiver of specific data is ready
 			case(MsgType::kDataIsReady): {
-				int64_t dst_machine_id = msg.msg_body.dst_machine_id;
+				int64_t dst_machine_id = msg.data_is_ready.dst_machine_id;
 				ibverbs_comm_net->SendMsg(dst_machine_id, msg);	
 				break;
 			}
+			// receiver machine allocates memory and starts to read data
 			case(MsgType::kAllocateMemory): {
-				size_t data_size = msg.msg_body.data_size;
-				int64_t src_machine_id = msg.msg_body.src_machine_id;
-				void* src_addr = msg.msg_body.src_addr;
+				size_t data_size = msg.allocate_memory.data_size;
+				int64_t src_machine_id = msg.allocate_memory.src_machine_id;
+				void* src_addr = msg.allocate_memory.src_addr;
 				data = malloc(data_size);	
-				Msg new_msg;
-				new_msg.msg_type = MsgType::kPleaseWrite;
-				MsgBody msg_body;
-				msg_body.src_addr = src_addr;
-				msg_body.dst_addr = data;
-				msg_body.data_size = data_size;
-				msg_body.src_machine_id = src_machine_id;
-				msg_body.dst_machine_id = this_machine_id;
-				new_msg.msg_body = msg_body; 
-				action_channel->Send(new_msg);	
+				ibverbs_comm_net->DoRead(src_machine_id, src_addr, data, data_size);
 				break;
 			}
-			case(MsgType::kPleaseWrite): {
-				int64_t src_machine_id = msg.msg_body.src_machine_id;
-				ibverbs_comm_net->SendMsg(src_machine_id, msg);
-				break;
-			}
-			case(MsgType::kDoWrite): {
-				void* src_addr = msg.msg_body.src_addr;
-				void* dst_addr = msg.msg_body.dst_addr;
-				size_t data_size = msg.msg_body.data_size;
-				int64_t src_machine_id = msg.msg_body.src_machine_id;
-				int64_t dst_machine_id = msg.msg_body.dst_machine_id;
-				std::cout << "write from " << src_machine_id << " to " << dst_machine_id << std::endl;
-				ibverbs_comm_net->AsyncWrite(src_machine_id, dst_machine_id, src_addr, dst_addr, data_size);
-				break;
-			}
+			// receiver machine finish reading data procedure
 			case(MsgType::kReadDone): {
 				int* result = reinterpret_cast<int*>(data);
-				for (int i = 8 * 1024 * 1024; i < 8 * 1024 * 1024 + 100;i++) {
+				double err = 0;
+				for (int i = 0;i < 16 * 1024 * 1024; i++) {
+					err += abs(result[i] - i);
+				}
+				std::cout << "Transfer error is " << err << std::endl;
+				for (int i = 0; i < 100;i++) {
 					std::cout << result[i] << " ";
 				}
 				std::cout << std::endl;
 				break;
 			}
 			default: {
-				std::cout << "Unsupport message" << std::endl;
+				std::cout << "Unsupport message type" << std::endl;
 			}
 		}
 	}
@@ -86,17 +70,15 @@ int main(int argc, char* argv[]) {
 	std::cout << "This machine id is: " << this_machine_id << std::endl;
 	if (this_machine_id == 0) {
 		int *test_data_arr = new int[1024 * 1024 * 16];
-		for (int i = 0;i < 1024 * 1024 * 16;i++) {
+		for (int i = 0; i < 1024 * 1024 * 16; i++) {
 			test_data_arr[i] = i;
 		}
 		Msg msg;
 		msg.msg_type = MsgType::kDataIsReady;
-		MsgBody msg_body;
-		msg_body.src_addr = reinterpret_cast<void*>(test_data_arr);
-		msg_body.data_size = 1024 * 1024 * 16 * sizeof(int);
-		msg_body.src_machine_id = this_machine_id;
-		msg_body.dst_machine_id = 1;
-		msg.msg_body = msg_body; 
+		msg.data_is_ready.src_addr = reinterpret_cast<void*>(test_data_arr);
+		msg.data_is_ready.data_size = 1024 * 1024 * 16 * sizeof(int);
+		msg.data_is_ready.src_machine_id = this_machine_id;
+		msg.data_is_ready.dst_machine_id = 1;
 		action_channel.Send(msg);
 	}
 	std::thread action_poller(HandleActions, &action_channel, ibverbs_comm_net, this_machine_id);

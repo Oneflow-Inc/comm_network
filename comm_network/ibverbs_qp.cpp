@@ -4,7 +4,7 @@
 #include "comm_network/ibverbs_comm_network.h"
 
 namespace comm_network {
-IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv_cq) {
+IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv_cq, IBVerbsHelper* helper) {
   // ctx_, pd_
   ctx_ = ctx;
   pd_ = pd;
@@ -32,6 +32,7 @@ IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv
   FOR_RANGE(size_t, i, 0, recv_msg_buf_.size()) { recv_msg_buf_.at(i) = new MsgMR(pd_); }
   // send_msg_buf_
   CHECK(send_msg_buf_.empty());
+  helper_ = helper;
 }
 
 IBVerbsQP::~IBVerbsQP() {
@@ -100,20 +101,19 @@ void IBVerbsQP::PostAllRecvRequest() {
 }
 
 void IBVerbsQP::PostWriteRequest(const IBVerbsMemDescProto& remote_mem,
-                                 const IBVerbsMemDesc& local_mem, const Msg& write_partial) {
+                                 const IBVerbsMemDesc& local_mem, uint32_t imm_data) {
   CHECK_EQ(remote_mem.mem_ptr_size(), local_mem.sge_vec().size());
   WorkRequestId* wr_id = NewWorkRequestId();
   wr_id->outstanding_sge_cnt = local_mem.sge_vec().size();
-  wr_id->msg_write_partial = write_partial;
   FOR_RANGE(size_t, i, 0, local_mem.sge_vec().size()) {
     ibv_send_wr wr;
     wr.wr_id = reinterpret_cast<uint64_t>(wr_id);
     wr.next = nullptr;
     wr.sg_list = const_cast<ibv_sge*>(&(local_mem.sge_vec().at(i)));
     wr.num_sge = 1;
-    wr.opcode = IBV_WR_RDMA_WRITE;
+    wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
     wr.send_flags = 0;
-    wr.imm_data = 0;
+    wr.imm_data = imm_data;
     wr.wr.rdma.remote_addr = remote_mem.mem_ptr(i);
     wr.wr.rdma.rkey = remote_mem.mr_rkey(i);
     ibv_send_wr* bad_wr = nullptr;
@@ -139,19 +139,10 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
   CHECK_EQ(ibv_post_send(qp_, &wr, &bad_wr), 0);
 }
 
-void IBVerbsQP::WriteDone(WorkRequestId* wr_id) {
-  Msg write_partial = wr_id->msg_write_partial;
-  Msg msg;
-  msg.msg_type = MsgType::kPartialWriteDone;
-  LOG(INFO) << "Write Done " << write_partial.msg_body.buffer_id;
-  msg.msg_body.data_size = write_partial.msg_body.data_size;
-  msg.msg_body.src_machine_id = write_partial.msg_body.src_machine_id;
-  msg.msg_body.dst_machine_id = write_partial.msg_body.dst_machine_id;
-  msg.msg_body.buffer_id = write_partial.msg_body.buffer_id;
-  msg.msg_body.dst_addr = write_partial.msg_body.dst_addr;
-  msg.msg_body.piece_id = write_partial.msg_body.piece_id;
-  msg.msg_body.num_of_pieces = write_partial.msg_body.num_of_pieces;
-  Global<IBVerbsCommNet>::Get()->SendMsg(write_partial.msg_body.dst_machine_id, msg);
+void IBVerbsQP::WriteDone(WorkRequestId* wr_id, uint32_t imm_data) {
+  uint32_t read_id = imm_data >> 8;
+  uint8_t buffer_id = imm_data & (0xFF);
+  helper_->AsyncRead(read_id, buffer_id); 
   DeleteWorkRequestId(wr_id);
 }
 
@@ -163,38 +154,37 @@ void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
   DeleteWorkRequestId(wr_id);
 }
 
-void IBVerbsQP::RecvDone(WorkRequestId* wr_id, Channel<Msg>* msg_channel) {
+void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
   Msg recv_msg = wr_id->msg_mr->msg();
   switch (recv_msg.msg_type) {
     case (MsgType::kDataIsReady): {
       Msg msg;
       msg.msg_type = MsgType::kAllocateMemory;
-      msg.msg_body.data_size = recv_msg.msg_body.data_size;
-      msg.msg_body.src_addr = recv_msg.msg_body.src_addr;
-      msg.msg_body.src_machine_id = recv_msg.msg_body.src_machine_id;
-      msg_channel->Send(msg);
+      msg.allocate_memory.data_size = recv_msg.data_is_ready.data_size;
+      msg.allocate_memory.src_addr = recv_msg.data_is_ready.src_addr;
+      msg.allocate_memory.src_machine_id = recv_msg.data_is_ready.src_machine_id;
+      Global<IBVerbsCommNet>::Get()->SendToChannel(msg);
       break;
     }
     case (MsgType::kPleaseWrite): {
+      int64_t dst_machine_id = recv_msg.please_write.dst_machine_id;
+      void* src_addr = recv_msg.please_write.src_addr;
+      size_t data_size = recv_msg.please_write.data_size;
+      uint32_t read_id = recv_msg.please_write.read_id;
+      // use write helper to write message 
       Msg msg;
-      msg.msg_type = MsgType::kDoWrite;
-      msg.msg_body.src_addr = recv_msg.msg_body.src_addr;
-      msg.msg_body.dst_addr = recv_msg.msg_body.dst_addr;
-      msg.msg_body.data_size = recv_msg.msg_body.data_size;
-      msg.msg_body.src_machine_id = recv_msg.msg_body.src_machine_id;
-      msg.msg_body.dst_machine_id = recv_msg.msg_body.dst_machine_id;
-      msg_channel->Send(msg);
-      break;
-    }
-    case (MsgType::kPartialWriteDone): {
-      Global<IBVerbsCommNet>::Get()->Register2NormalMemory(recv_msg);
+      msg.msg_type = MsgType::kWorkRecord;
+      msg.work_record.id = read_id;
+      msg.work_record.machine_id = dst_machine_id;
+      msg.work_record.offset = 0;
+      msg.work_record.begin_addr = src_addr;
+      msg.work_record.data_size = data_size;
+      helper_->AsyncWrite(msg);
       break;
     }
     case (MsgType::kFreeBufferPair): {
-      int64_t src_machine_id = recv_msg.msg_body.src_machine_id;
-      int64_t dst_machine_id = recv_msg.msg_body.dst_machine_id;
-      int8_t buffer_id = recv_msg.msg_body.buffer_id;
-      Global<IBVerbsCommNet>::Get()->ReleaseBuffer(src_machine_id, dst_machine_id, buffer_id);
+      uint8_t buffer_id = recv_msg.free_buffer_pair.buffer_id;
+      helper_->FreeBuffer(buffer_id);
       break;
     }
     default: {

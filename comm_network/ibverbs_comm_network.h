@@ -4,6 +4,9 @@
 #include "comm_network/ibverbs_qp.h"
 #include "comm_network/control/ctrl_client.h"
 #include "comm_network/control/ctrl_server.h"
+#include "comm_network/ibverbs_helper.h"
+#include "comm_network/ibverbs_poller.h"
+#include "comm_network/common/channel.h"
 
 namespace comm_network {
 class IBVerbsCommNet final {
@@ -16,42 +19,34 @@ class IBVerbsCommNet final {
   void RegisterFixNumMemory();
   void UnRegisterFixNumMemory();
 
-  bool FindAvailSendMemory(int64_t src_machine_id, int64_t dst_machine_id, std::string& send_key,
-                           std::string& recv_key, int& buffer_id);
-  const std::unordered_map<std::string, std::pair<IBVerbsMemDesc*, bool>>& mem_desc() {
-    return mem_desc_;
-  }
-  const std::vector<std::unordered_map<std::string, IBVerbsMemDescProto>> mem_desc_list() {
-    return mem_desc_list_;
-  }
+  std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> GetSendRecvMemPairForSender(int64_t machine_id, uint8_t buffer_id); 
+  Msg GetWorkRecord(uint32_t read_id) { return read_queue_[read_id]; }
+  IBVerbsMemDesc* GetRecvMemDescForReceiver(int64_t machine_id, uint8_t buffer_id);
 
-  void AsyncWrite(int64_t src_machine_id, int64_t dst_machine_id, void* src_addr, void* dst_addr,
-                  size_t data_size);
+  void DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size);
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
-  void Register2NormalMemory(const Msg& recv_msg);
-  void ReleaseBuffer(int64_t src_machine_id, int64_t dst_machine_id, int8_t buffer_id);
+  void SendToChannel(const Msg& msg) { action_channel_->Send(msg); }
+  void Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc, IBVerbsMemDescProto recv_mem_desc_proto, uint32_t imm_data);
+  void Register2NormalDone(int64_t machine_id, uint8_t buffer_id, uint32_t read_id, bool last_piece);
 
  private:
   void* RegisterMemory(std::string key, void* ptr, size_t byte_size);
   void UnRegisterMemory(std::string key);
-  void PollCQ();
-  void PollQueue();
-  static const int32_t max_poll_wc_num_;
+  uint32_t AllocateReadId();
+  void FreeReadId(uint32_t read_id);
   std::unordered_set<int64_t> peer_machine_id_;
   std::vector<IBVerbsQP*> qp_vec_;
+  std::vector<IBVerbsHelper*> helper_vec_;
   ibv_context* context_;
   ibv_pd* pd_;
   ibv_cq* cq_;
-  std::thread poll_thread_;
-  std::thread poll_channel_thread_;
-  Channel<Msg> write_channel_;
-  std::atomic_flag poll_exit_flag_;
-  Channel<Msg>* action_channel_;
+  Channel<Msg> *action_channel_;
   int64_t this_machine_id_;
-  std::unordered_map<std::string, std::pair<IBVerbsMemDesc*, bool>> mem_desc_;
+  std::unordered_map<std::string, IBVerbsMemDesc*> mem_desc_;
   std::vector<std::unordered_map<std::string, IBVerbsMemDescProto>> mem_desc_list_;
-  std::vector<std::queue<std::string>> idle_buffer_queue_;
-  std::mutex idle_buffer_queue_mtx_;
-  std::condition_variable idle_buffer_queue_cv_;
+  std::unordered_set<uint32_t> busy_read_ids_;
+  std::mutex busy_read_id_mtx_;
+  std::unordered_map<uint32_t, Msg> read_queue_;
+  IBVerbsPoller* poller_;
 };
 }  // namespace comm_network

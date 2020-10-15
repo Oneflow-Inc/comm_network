@@ -1,7 +1,7 @@
 #pragma once
 #include "comm_network/ibverbs_memory_desc.h"
 #include "comm_network/message.h"
-#include "comm_network/common/channel.h"
+#include "comm_network/ibverbs_helper.h"
 
 namespace comm_network {
 class MsgMR final {
@@ -29,14 +29,13 @@ struct WorkRequestId {
   IBVerbsQP* qp;
   int32_t outstanding_sge_cnt;
   MsgMR* msg_mr;
-  Msg msg_write_partial;
 };
 
 class IBVerbsQP final {
  public:
   CN_DISALLOW_COPY_AND_MOVE(IBVerbsQP);
   IBVerbsQP() = delete;
-  IBVerbsQP(ibv_context*, ibv_pd*, ibv_cq* send_cq, ibv_cq* recv_cq);
+  IBVerbsQP(ibv_context*, ibv_pd*, ibv_cq* send_cq, ibv_cq* recv_cq, IBVerbsHelper* helper);
   ~IBVerbsQP();
 
   uint32_t qp_num() const { return qp_->qp_num; }
@@ -44,12 +43,12 @@ class IBVerbsQP final {
   void PostAllRecvRequest();
 
   void PostWriteRequest(const IBVerbsMemDescProto& remote_mem, const IBVerbsMemDesc& local_mem,
-                        const Msg& msg_write_partial);
+                        uint32_t imm_data);
   void PostSendRequest(const Msg& msg);
 
-  void WriteDone(WorkRequestId*);
+  void WriteDone(WorkRequestId*, uint32_t imm_data);
   void SendDone(WorkRequestId*);
-  void RecvDone(WorkRequestId*, Channel<Msg>*);
+  void RecvDone(WorkRequestId*);
 
  private:
   WorkRequestId* NewWorkRequestId();
@@ -64,5 +63,6 @@ class IBVerbsQP final {
 
   std::mutex send_msg_buf_mtx_;
   std::queue<MsgMR*> send_msg_buf_;
+  IBVerbsHelper* helper_;
 };
 }  // namespace comm_network
