@@ -2,14 +2,9 @@
 #include "comm_network/ibverbs_qp.h"
 
 namespace comm_network {
-IBVerbsPoller::IBVerbsPoller(ibv_cq* cq) 
-    : poll_exit_flag_(ATOMIC_FLAG_INIT) {
-  cq_ = cq;
-}
+IBVerbsPoller::IBVerbsPoller(ibv_cq* cq) : poll_exit_flag_(ATOMIC_FLAG_INIT) { cq_ = cq; }
 
-void IBVerbsPoller::Start() {
-  poll_thread_ = std::thread(&IBVerbsPoller::PollCQ, this);
-}
+void IBVerbsPoller::Start() { poll_thread_ = std::thread(&IBVerbsPoller::PollCQ, this); }
 
 void IBVerbsPoller::Stop() {
   while (poll_exit_flag_.test_and_set() == true) {}
@@ -53,4 +48,4 @@ void IBVerbsPoller::PollCQ() {
 }
 
 const int32_t IBVerbsPoller::max_poll_wc_num_ = 32;
-}
+}  // namespace comm_network

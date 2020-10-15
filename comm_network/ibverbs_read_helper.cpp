@@ -8,7 +8,8 @@ void IBVerbsReadHelper::AsyncRead(uint32_t read_id, uint8_t buffer_id) {
   // get work record using read_id
   Msg cur_msg = Global<IBVerbsCommNet>::Get()->GetWorkRecord(read_id);
   int64_t src_machine_id = cur_msg.work_record.machine_id;
-  IBVerbsMemDesc* recv_mem_desc = Global<IBVerbsCommNet>::Get()->GetRecvMemDescForReceiver(src_machine_id, buffer_id);
+  IBVerbsMemDesc* recv_mem_desc =
+      Global<IBVerbsCommNet>::Get()->GetRecvMemDescForReceiver(src_machine_id, buffer_id);
   // register memory to normal memory
   ibv_sge cur_sge = recv_mem_desc->sge_vec().at(0);
   size_t offset = *reinterpret_cast<size_t*>(cur_sge.addr);
@@ -20,4 +21,4 @@ void IBVerbsReadHelper::AsyncRead(uint32_t read_id, uint8_t buffer_id) {
   Global<IBVerbsCommNet>::Get()->Register2NormalDone(src_machine_id, buffer_id, read_id, is_last);
 }
 
-}
+}  // namespace comm_network

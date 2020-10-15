@@ -23,8 +23,7 @@ std::string GenRegisterRecvMemoryKey(int64_t src_machine_id, int64_t dst_machine
          + std::to_string(dst_machine_id) + "/" + std::to_string(idx);
 }
 
-IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) :
-    action_channel_(action_channel) {
+IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(action_channel) {
   int64_t total_machine_num = Global<EnvDesc>::Get()->TotalMachineNum();
   this_machine_id_ =
       Global<EnvDesc>::Get()->GetMachineId(Global<CtrlServer>::Get()->this_machine_addr());
@@ -55,7 +54,7 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) :
   qp_vec_.assign(peer_machine_id_.size() + 1, nullptr);
   helper_vec_.assign(peer_machine_id_.size() + 1, nullptr);
   for (int64_t peer_id : peer_machine_id()) {
-    IBVerbsHelper* cur_helper = new IBVerbsHelper; 
+    IBVerbsHelper* cur_helper = new IBVerbsHelper;
     IBVerbsQP* cur_qp = new IBVerbsQP(context_, pd_, cq_, cq_, cur_helper);
     qp_vec_.at(peer_id) = cur_qp;
     helper_vec_.at(peer_id) = cur_helper;
@@ -98,14 +97,15 @@ void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, const Msg& msg) {
   qp_vec_.at(dst_machine_id)->PostSendRequest(msg);
 }
 
-void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size) {
+void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr,
+                            size_t data_size) {
   // send "PleaseWrite" message to sender machine
   Msg msg;
   msg.msg_type = MsgType::kPleaseWrite;
   msg.please_write.dst_machine_id = this_machine_id_;
   msg.please_write.src_addr = src_addr;
   msg.please_write.data_size = data_size;
-  uint32_t read_id = AllocateReadId(); 
+  uint32_t read_id = AllocateReadId();
   msg.please_write.read_id = read_id;
   qp_vec_.at(src_machine_id)->PostSendRequest(msg);
   // enqueue this new work record into read_queue
@@ -129,9 +129,7 @@ uint32_t IBVerbsCommNet::AllocateReadId() {
     read_id = read_id_distrib(gen);
     std::unique_lock<std::mutex> lock(busy_read_id_mtx_);
     flag = (busy_read_ids_.find(read_id) == busy_read_ids_.end());
-    if (flag) {
-      busy_read_ids_.insert(read_id);
-    }
+    if (flag) { busy_read_ids_.insert(read_id); }
   } while (!flag);
   return read_id;
 }
@@ -141,7 +139,8 @@ void IBVerbsCommNet::FreeReadId(uint32_t read_id) {
   CHECK_EQ(busy_read_ids_.erase(read_id), 1);
 }
 
-std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> IBVerbsCommNet::GetSendRecvMemPairForSender(int64_t machine_id, uint8_t buffer_id) {
+std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> IBVerbsCommNet::GetSendRecvMemPairForSender(
+    int64_t machine_id, uint8_t buffer_id) {
   std::string send_key = GenRegisterSendMemoryKey(this_machine_id_, machine_id, buffer_id);
   std::string recv_key = GenRegisterRecvMemoryKey(this_machine_id_, machine_id, buffer_id);
   IBVerbsMemDesc* send_mem_desc = mem_desc_[send_key];
@@ -155,11 +154,14 @@ IBVerbsMemDesc* IBVerbsCommNet::GetRecvMemDescForReceiver(int64_t machine_id, ui
   return recv_mem_desc;
 }
 
-void IBVerbsCommNet::Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc, IBVerbsMemDescProto recv_mem_desc_proto, uint32_t imm_data) {
+void IBVerbsCommNet::Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
+                                         IBVerbsMemDescProto recv_mem_desc_proto,
+                                         uint32_t imm_data) {
   qp_vec_.at(dst_machine_id)->PostWriteRequest(recv_mem_desc_proto, *send_mem_desc, imm_data);
 }
 
-void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, uint32_t read_id, bool last_piece) {
+void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, uint32_t read_id,
+                                         bool last_piece) {
   Msg cur_msg;
   cur_msg.msg_type = MsgType::kFreeBufferPair;
   cur_msg.free_buffer_pair.src_machine_id = machine_id;
@@ -167,7 +169,7 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
   SendMsg(machine_id, cur_msg);
   if (last_piece) {
     CHECK_EQ(read_queue_.erase(read_id), 1);
-    FreeReadId(read_id); 
+    FreeReadId(read_id);
     LOG(INFO) << "All data has been received";
     Msg finish_msg;
     finish_msg.msg_type = MsgType::kReadDone;

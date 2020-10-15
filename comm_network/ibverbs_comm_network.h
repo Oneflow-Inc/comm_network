@@ -19,15 +19,18 @@ class IBVerbsCommNet final {
   void RegisterFixNumMemory();
   void UnRegisterFixNumMemory();
 
-  std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> GetSendRecvMemPairForSender(int64_t machine_id, uint8_t buffer_id); 
+  std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> GetSendRecvMemPairForSender(int64_t machine_id,
+                                                                              uint8_t buffer_id);
   Msg GetWorkRecord(uint32_t read_id) { return read_queue_[read_id]; }
   IBVerbsMemDesc* GetRecvMemDescForReceiver(int64_t machine_id, uint8_t buffer_id);
 
   void DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size);
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
   void SendToChannel(const Msg& msg) { action_channel_->Send(msg); }
-  void Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc, IBVerbsMemDescProto recv_mem_desc_proto, uint32_t imm_data);
-  void Register2NormalDone(int64_t machine_id, uint8_t buffer_id, uint32_t read_id, bool last_piece);
+  void Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
+                           IBVerbsMemDescProto recv_mem_desc_proto, uint32_t imm_data);
+  void Register2NormalDone(int64_t machine_id, uint8_t buffer_id, uint32_t read_id,
+                           bool last_piece);
 
  private:
   void* RegisterMemory(std::string key, void* ptr, size_t byte_size);
@@ -40,7 +43,7 @@ class IBVerbsCommNet final {
   ibv_context* context_;
   ibv_pd* pd_;
   ibv_cq* cq_;
-  Channel<Msg> *action_channel_;
+  Channel<Msg>* action_channel_;
   int64_t this_machine_id_;
   std::unordered_map<std::string, IBVerbsMemDesc*> mem_desc_;
   std::vector<std::unordered_map<std::string, IBVerbsMemDescProto>> mem_desc_list_;

@@ -1,4 +1,4 @@
-#pragma once 
+#pragma once
 #include "comm_network/common/utils.h"
 
 namespace comm_network {
@@ -9,4 +9,4 @@ class IBVerbsReadHelper {
   ~IBVerbsReadHelper() = default;
   void AsyncRead(uint32_t read_id, uint8_t buffer_id);
 };
-}
+}  // namespace comm_network

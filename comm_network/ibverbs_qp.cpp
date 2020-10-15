@@ -4,7 +4,8 @@
 #include "comm_network/ibverbs_comm_network.h"
 
 namespace comm_network {
-IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv_cq, IBVerbsHelper* helper) {
+IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv_cq,
+                     IBVerbsHelper* helper) {
   // ctx_, pd_
   ctx_ = ctx;
   pd_ = pd;
@@ -142,7 +143,7 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
 void IBVerbsQP::WriteDone(WorkRequestId* wr_id, uint32_t imm_data) {
   uint32_t read_id = imm_data >> 8;
   uint8_t buffer_id = imm_data & (0xFF);
-  helper_->AsyncRead(read_id, buffer_id); 
+  helper_->AsyncRead(read_id, buffer_id);
   DeleteWorkRequestId(wr_id);
 }
 
@@ -171,7 +172,7 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
       void* src_addr = recv_msg.please_write.src_addr;
       size_t data_size = recv_msg.please_write.data_size;
       uint32_t read_id = recv_msg.please_write.read_id;
-      // use write helper to write message 
+      // use write helper to write message
       Msg msg;
       msg.msg_type = MsgType::kWorkRecord;
       msg.work_record.id = read_id;

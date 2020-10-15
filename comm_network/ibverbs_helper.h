@@ -18,4 +18,4 @@ class IBVerbsHelper final {
   IBVerbsReadHelper* read_helper_;
   IBVerbsWriteHelper* write_helper_;
 };
-}
+}  // namespace comm_network

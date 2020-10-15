@@ -19,4 +19,4 @@ class IBVerbsPoller {
   std::atomic_flag poll_exit_flag_;
   ibv_cq* cq_;
 };
-}
+}  // namespace comm_network

@@ -12,6 +12,8 @@ IBVerbsHelper::~IBVerbsHelper() {
 }
 
 void IBVerbsHelper::AsyncWrite(const Msg& msg) { write_helper_->AsyncWrite(msg); }
-void IBVerbsHelper::AsyncRead(uint32_t read_id, uint8_t buffer_id) { read_helper_->AsyncRead(read_id, buffer_id);}
-void IBVerbsHelper::FreeBuffer(uint8_t buffer_id) {write_helper_->FreeBuffer(buffer_id); }
+void IBVerbsHelper::AsyncRead(uint32_t read_id, uint8_t buffer_id) {
+  read_helper_->AsyncRead(read_id, buffer_id);
 }
+void IBVerbsHelper::FreeBuffer(uint8_t buffer_id) { write_helper_->FreeBuffer(buffer_id); }
+}  // namespace comm_network

@@ -6,15 +6,11 @@ IBVerbsWriteHelper::IBVerbsWriteHelper() {
   cur_msg_queue_ = new std::queue<Msg>;
   pending_msg_queue_ = new std::queue<Msg>;
   thread_is_busy_ = false;
-  for (int i = 0; i < num_of_register_buffer / 2; i++) {
-    idle_buffer_queue_.push(i);
-  }
+  for (int i = 0; i < num_of_register_buffer / 2; i++) { idle_buffer_queue_.push(i); }
 }
 
 IBVerbsWriteHelper::~IBVerbsWriteHelper() {
-  if (thread_is_busy_) {
-    thread_.join();
-  }
+  if (thread_is_busy_) { thread_.join(); }
   CHECK(cur_msg_queue_->empty());
   delete cur_msg_queue_;
   cur_msg_queue_ = nullptr;
@@ -49,7 +45,8 @@ void IBVerbsWriteHelper::LoopProcess() {
       idle_buffer_queue_.pop();
     }
     // normal memory to register memory
-    auto mem_desc_pair = Global<IBVerbsCommNet>::Get()->GetSendRecvMemPairForSender(cur_msg.work_record.machine_id, buffer_id);
+    auto mem_desc_pair = Global<IBVerbsCommNet>::Get()->GetSendRecvMemPairForSender(
+        cur_msg.work_record.machine_id, buffer_id);
     IBVerbsMemDesc* send_mem_desc = mem_desc_pair.first;
     IBVerbsMemDescProto recv_mem_desc_proto = mem_desc_pair.second;
     ibv_sge cur_sge = send_mem_desc->sge_vec().at(0);
@@ -59,19 +56,18 @@ void IBVerbsWriteHelper::LoopProcess() {
     size_t transfer_size = std::min(data_size - offset, buffer_size - sizeof(size_t));
     char* src_addr = reinterpret_cast<char*>(begin_addr) + offset;
     // header include start offset
-    memcpy(reinterpret_cast<void*>(cur_sge.addr), &offset, sizeof(size_t)); 
+    memcpy(reinterpret_cast<void*>(cur_sge.addr), &offset, sizeof(size_t));
     cur_sge.addr += sizeof(size_t);
     memcpy(reinterpret_cast<void*>(cur_sge.addr), src_addr, transfer_size);
     cur_msg.work_record.offset += transfer_size;
     {
       std::unique_lock<std::mutex> lck(pending_msg_queue_mtx_);
-      if (cur_msg.work_record.offset < data_size) {
-        pending_msg_queue_->push(cur_msg);
-      }
+      if (cur_msg.work_record.offset < data_size) { pending_msg_queue_->push(cur_msg); }
     }
     uint32_t imm_data = cur_msg.work_record.id << 8;
     imm_data += buffer_id;
-    Global<IBVerbsCommNet>::Get()->Normal2RegisterDone(cur_msg.work_record.machine_id, send_mem_desc, recv_mem_desc_proto, imm_data);
+    Global<IBVerbsCommNet>::Get()->Normal2RegisterDone(
+        cur_msg.work_record.machine_id, send_mem_desc, recv_mem_desc_proto, imm_data);
     if (cur_msg_queue_->empty()) {
       std::unique_lock<std::mutex> lck(pending_msg_queue_mtx_);
       std::swap(cur_msg_queue_, pending_msg_queue_);
@@ -93,4 +89,4 @@ void IBVerbsWriteHelper::FreeBuffer(uint8_t buffer_id) {
   idle_buffer_queue_.push(buffer_id);
   idle_buffer_queue_cv_.notify_one();
 }
-}
+}  // namespace comm_network

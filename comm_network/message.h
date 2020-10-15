@@ -24,9 +24,9 @@ struct AllocateMemory {
 };
 
 struct PleaseWrite {
-	int64_t dst_machine_id;
-	void* src_addr;
-	size_t data_size;
+  int64_t dst_machine_id;
+  void* src_addr;
+  size_t data_size;
   uint32_t read_id;
 };
 
@@ -43,9 +43,7 @@ struct FreeBufferPair {
   uint8_t buffer_id;
 };
 
-struct ReadDone {
-
-};
+struct ReadDone {};
 
 struct Msg {
   MsgType msg_type;

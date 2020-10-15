@@ -14,7 +14,7 @@ class IBVerbsWriteHelper final {
   void FreeBuffer(uint8_t buffer_id);
   void LoopProcess();
   void NotifyMeToWrite();
-  
+
  private:
   std::thread thread_;
   bool thread_is_busy_;
@@ -25,4 +25,4 @@ class IBVerbsWriteHelper final {
   std::mutex idle_buffer_queue_mtx_;
   std::condition_variable idle_buffer_queue_cv_;
 };
-}
+}  // namespace comm_network
