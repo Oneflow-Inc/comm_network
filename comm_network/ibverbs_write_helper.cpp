@@ -10,7 +10,7 @@ IBVerbsWriteHelper::IBVerbsWriteHelper() {
 }
 
 IBVerbsWriteHelper::~IBVerbsWriteHelper() {
-  if (thread_is_busy_) { thread_.join(); }
+  thread_.join();
   CHECK(cur_msg_queue_->empty());
   delete cur_msg_queue_;
   cur_msg_queue_ = nullptr;

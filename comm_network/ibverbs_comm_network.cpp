@@ -168,11 +168,14 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
   cur_msg.free_buffer_pair.buffer_id = buffer_id;
   SendMsg(machine_id, cur_msg);
   if (last_piece) {
+    void* begin_addr = read_queue_[read_id].work_record.begin_addr;
+    size_t data_size = read_queue_[read_id].work_record.data_size;
     CHECK_EQ(read_queue_.erase(read_id), 1);
     FreeReadId(read_id);
-    LOG(INFO) << "All data has been received";
     Msg finish_msg;
     finish_msg.msg_type = MsgType::kReadDone;
+    finish_msg.read_done.begin_addr = begin_addr;
+    finish_msg.read_done.data_size = data_size;
     action_channel_->Send(finish_msg);
   }
 }

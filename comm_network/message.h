@@ -43,7 +43,10 @@ struct FreeBufferPair {
   uint8_t buffer_id;
 };
 
-struct ReadDone {};
+struct ReadDone {
+  void* begin_addr;
+  size_t data_size;
+};
 
 struct Msg {
   MsgType msg_type;
