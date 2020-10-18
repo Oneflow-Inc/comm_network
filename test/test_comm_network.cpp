@@ -17,8 +17,12 @@ EnvProto InitEnvProto(const std::vector<std::string>& ip_confs, int32_t ctrl_por
 	return env_proto;
 }
 
+namespace {
+	std::unordered_map<void*, std::vector<std::chrono::steady_clock::time_point>> time_points;
+	size_t total_bytes = 0;
+}
+
 void HandleActions(Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_net, int64_t this_machine_id) {
-	void* data;
 	Msg msg;
 	while (action_channel->Receive(&msg) == kChannelStatusSuccess) {
 		switch (msg.msg_type) {
@@ -33,22 +37,27 @@ void HandleActions(Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_ne
 				size_t data_size = msg.allocate_memory.data_size;
 				int64_t src_machine_id = msg.allocate_memory.src_machine_id;
 				void* src_addr = msg.allocate_memory.src_addr;
-				data = malloc(data_size);	
+				void* data = malloc(data_size);	
+				time_points[data].push_back(std::chrono::steady_clock::now());
 				ibverbs_comm_net->DoRead(src_machine_id, src_addr, data, data_size);
 				break;
 			}
 			// receiver machine finish reading data procedure
 			case(MsgType::kReadDone): {
-				int* result = reinterpret_cast<int*>(data);
+				void* data = msg.read_done.begin_addr;
+				size_t data_size = msg.read_done.data_size;
+				time_points[data].push_back(std::chrono::steady_clock::now());
+				int32_t* result = reinterpret_cast<int32_t*>(data);
+				int num_of_elements = data_size / sizeof(result[0]);
 				double err = 0;
-				for (int i = 0;i < 16 * 1024 * 1024; i++) {
-					err += abs(result[i] - i);
+				for (int i = 0; i < num_of_elements; i++) {
+					err += abs(result[i] - i - num_of_elements);
 				}
-				std::cout << "Transfer error is " << err << std::endl;
-				for (int i = 0; i < 100;i++) {
-					std::cout << result[i] << " ";
+				std::cout << "Reading " <<  (data_size/1024/1024) << " MB data done. With error " << err << std::endl; 
+				if (abs(err) >= 0.001) {
+					std::cerr << "Error occurs when reading " << (total_bytes/1024/1024) << " MB data. " << std::endl; 
 				}
-				std::cout << std::endl;
+				total_bytes += data_size;
 				break;
 			}
 			default: {
@@ -58,8 +67,65 @@ void HandleActions(Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_ne
 	}
 }
 
+void TestCorrectness(int64_t this_machine_id, Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_net) {
+  std::cout << "Test for correctness. Start. \nEach machine will read 50 blocks of data alternately. "
+              "Each read procedure has its correctness verification.\n";
+  int test_num = 50;
+	time_points.clear();
+	total_bytes = 0;
+	std::vector<size_t> origin_size_list(test_num);
+	std::vector<void*> origin_ptr_list(test_num);
+	srand(time(NULL));
+	for (int i = 0; i < test_num; i++) {
+		origin_size_list.at(i) = (rand() % 100 + 1) * 1024 * 1024; 
+		origin_ptr_list.at(i) = malloc(origin_size_list.at(i));
+		int32_t* test_data = reinterpret_cast<int32_t*>(origin_ptr_list.at(i));
+		int num_of_elements = origin_size_list.at(i) / sizeof(int32_t); 
+		for (int j = 0; j < num_of_elements; j++) {
+			test_data[j] = j + num_of_elements;
+		}
+	}
+	int64_t peer_machine_id;
+	if (this_machine_id == 0) {
+		peer_machine_id = 1;
+	} else if (this_machine_id == 1) {
+		peer_machine_id = 0;
+	}
+	for (int i = 0; i < test_num; i++) {
+		Msg msg;
+		msg.msg_type = MsgType::kDataIsReady;
+		msg.data_is_ready.src_addr = origin_ptr_list.at(i);
+		msg.data_is_ready.data_size = origin_size_list.at(i);
+		msg.data_is_ready.src_machine_id = this_machine_id;
+		msg.data_is_ready.dst_machine_id = peer_machine_id;
+		action_channel->Send(msg);	
+	}
+	std::thread action_poller(HandleActions, action_channel, ibverbs_comm_net, this_machine_id);
+	sleep(30);
+	action_channel->Close();
+	action_poller.join();
+	auto iter = time_points.begin();
+	std::chrono::steady_clock::time_point start = iter->second[0];
+	std::chrono::steady_clock::time_point end = iter->second[1];
+	iter++;
+	while (iter != time_points.end()) {
+		double diff = std::chrono::duration_cast<std::chrono::microseconds>(iter->second[0] - start).count();
+		if (diff < 0) {
+			start = iter->second[0];
+		} 
+		diff = std::chrono::duration_cast<std::chrono::microseconds>(iter->second[1] - end).count(); 
+		if (diff > 0) {
+			end = iter->second[1];
+		}
+		iter++;
+	} 
+	double duration_sec = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() / 1000000.0;  
+	std::cout << "the latency is : " << duration_sec << " s, the throughput is : " 
+		<< (1.0 * total_bytes / 1024 / 1024 ) / duration_sec << "MB/s. \n";
+}
+
 int main(int argc, char* argv[]) {
-	std::string ip_confs_raw_array[2] = {"192.168.1.12", "192.168.1.13"};
+	std::string ip_confs_raw_array[2] = {"192.168.1.12", "192.168.1.15"};
 	int32_t ctrl_port = 10534;
 	std::vector<std::string> ip_confs(ip_confs_raw_array, ip_confs_raw_array + 2);
 	EnvProto env_proto = InitEnvProto(ip_confs, ctrl_port);
@@ -68,24 +134,8 @@ int main(int argc, char* argv[]) {
 	
 	int64_t this_machine_id = ThisMachineId();
 	std::cout << "This machine id is: " << this_machine_id << std::endl;
-	if (this_machine_id == 0) {
-		int *test_data_arr = new int[1024 * 1024 * 16];
-		for (int i = 0; i < 1024 * 1024 * 16; i++) {
-			test_data_arr[i] = i;
-		}
-		Msg msg;
-		msg.msg_type = MsgType::kDataIsReady;
-		msg.data_is_ready.src_addr = reinterpret_cast<void*>(test_data_arr);
-		msg.data_is_ready.data_size = 1024 * 1024 * 16 * sizeof(int);
-		msg.data_is_ready.src_machine_id = this_machine_id;
-		msg.data_is_ready.dst_machine_id = 1;
-		action_channel.Send(msg);
-	}
-	std::thread action_poller(HandleActions, &action_channel, ibverbs_comm_net, this_machine_id);
-	sleep(120);
+  TestCorrectness(this_machine_id, &action_channel, ibverbs_comm_net);
 	DestroyCommNet();
-	action_channel.Close();
-	action_poller.join();
 	return 0;
 }
 
