@@ -53,7 +53,6 @@ void HandleActions(Channel<Msg>* action_channel, IBVerbsCommNet* ibverbs_comm_ne
 				for (int i = 0; i < num_of_elements; i++) {
 					err += abs(result[i] - i - num_of_elements);
 				}
-				std::cout << "Reading " <<  (data_size/1024/1024) << " MB data done. With error " << err << std::endl; 
 				if (abs(err) >= 0.001) {
 					std::cerr << "Error occurs when reading " << (total_bytes/1024/1024) << " MB data. " << std::endl; 
 				}
