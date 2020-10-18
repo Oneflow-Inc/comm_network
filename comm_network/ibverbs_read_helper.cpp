@@ -12,11 +12,12 @@ void IBVerbsReadHelper::AsyncRead(uint32_t read_id, uint8_t buffer_id) {
       Global<IBVerbsCommNet>::Get()->GetRecvMemDescForReceiver(src_machine_id, buffer_id);
   // register memory to normal memory
   ibv_sge cur_sge = recv_mem_desc->sge_vec().at(0);
-  size_t offset = *reinterpret_cast<size_t*>(cur_sge.addr);
+  size_t offset = cur_msg.work_record.offset;
   void* dst_addr = reinterpret_cast<char*>(cur_msg.work_record.begin_addr) + offset;
   size_t data_size = cur_msg.work_record.data_size;
-  size_t transfer_size = std::min(data_size - offset, buffer_size - sizeof(size_t));
-  memcpy(dst_addr, reinterpret_cast<void*>(cur_sge.addr + sizeof(size_t)), transfer_size);
+  size_t transfer_size = std::min(data_size - offset, buffer_size);
+  memcpy(dst_addr, reinterpret_cast<void*>(cur_sge.addr), transfer_size);
+  Global<IBVerbsCommNet>::Get()->SetWorkRecordOffset(read_id, offset + transfer_size);
   bool is_last = (offset + transfer_size < data_size) ? false : true;
   Global<IBVerbsCommNet>::Get()->Register2NormalDone(src_machine_id, buffer_id, read_id, is_last);
 }

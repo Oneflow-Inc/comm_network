@@ -22,6 +22,7 @@ class IBVerbsCommNet final {
   std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> GetSendRecvMemPairForSender(int64_t machine_id,
                                                                               uint8_t buffer_id);
   Msg GetWorkRecord(uint32_t read_id) { return read_queue_[read_id]; }
+  void SetWorkRecordOffset(uint32_t read_id, size_t offset) { read_queue_[read_id].work_record.offset = offset; }
   IBVerbsMemDesc* GetRecvMemDescForReceiver(int64_t machine_id, uint8_t buffer_id);
 
   void DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size);

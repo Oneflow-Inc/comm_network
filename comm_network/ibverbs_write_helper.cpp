@@ -53,11 +53,8 @@ void IBVerbsWriteHelper::LoopProcess() {
     void* begin_addr = cur_msg.work_record.begin_addr;
     size_t data_size = cur_msg.work_record.data_size;
     size_t offset = cur_msg.work_record.offset;
-    size_t transfer_size = std::min(data_size - offset, buffer_size - sizeof(size_t));
+    size_t transfer_size = std::min(data_size - offset, buffer_size);
     char* src_addr = reinterpret_cast<char*>(begin_addr) + offset;
-    // header include start offset
-    memcpy(reinterpret_cast<void*>(cur_sge.addr), &offset, sizeof(size_t));
-    cur_sge.addr += sizeof(size_t);
     memcpy(reinterpret_cast<void*>(cur_sge.addr), src_addr, transfer_size);
     cur_msg.work_record.offset += transfer_size;
     {
