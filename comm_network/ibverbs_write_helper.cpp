@@ -36,6 +36,7 @@ bool IBVerbsWriteHelper::InitWriteHandle() {
 
 bool IBVerbsWriteHelper::RequestBuffer() {
   std::unique_lock<std::mutex> lock(idle_buffer_queue_mtx_);
+  // LOG(INFO) << idle_buffer_queue_.size();
   if (idle_buffer_queue_.empty()) { return false; }
   buffer_id_ = idle_buffer_queue_.front();
   idle_buffer_queue_.pop();

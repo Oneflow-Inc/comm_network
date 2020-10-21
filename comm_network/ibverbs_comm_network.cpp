@@ -98,7 +98,7 @@ void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, const Msg& msg) {
 }
 
 void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr,
-                            size_t data_size) {
+                            size_t data_size, std::function<void()> callback) {
   // send "PleaseWrite" message to sender machine
   Msg msg;
   msg.msg_type = MsgType::kPleaseWrite;
@@ -117,6 +117,7 @@ void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_ad
   record.work_record.begin_addr = dst_addr;
   record.work_record.data_size = data_size;
   read_queue_[read_id] = record;
+  callback_queue_[read_id] = callback;
 }
 
 uint32_t IBVerbsCommNet::AllocateReadId() {
@@ -170,13 +171,16 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
   if (last_piece) {
     void* begin_addr = read_queue_[read_id].work_record.begin_addr;
     size_t data_size = read_queue_[read_id].work_record.data_size;
+    auto cb = callback_queue_[read_id];
     CHECK_EQ(read_queue_.erase(read_id), 1);
+    CHECK_EQ(callback_queue_.erase(read_id), 1);
     FreeReadId(read_id);
-    Msg finish_msg;
-    finish_msg.msg_type = MsgType::kReadDone;
-    finish_msg.read_done.begin_addr = begin_addr;
-    finish_msg.read_done.data_size = data_size;
-    action_channel_->Send(finish_msg);
+    cb();
+    // Msg finish_msg;
+    // finish_msg.msg_type = MsgType::kReadDone;
+    // finish_msg.read_done.begin_addr = begin_addr;
+    // finish_msg.read_done.data_size = data_size;
+    // action_channel_->Send(finish_msg);
   }
 }
 

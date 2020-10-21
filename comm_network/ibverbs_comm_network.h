@@ -25,7 +25,7 @@ class IBVerbsCommNet final {
   void SetWorkRecordOffset(uint32_t read_id, size_t offset) { read_queue_[read_id].work_record.offset = offset; }
   IBVerbsMemDesc* GetRecvMemDescForReceiver(int64_t machine_id, uint8_t buffer_id);
 
-  void DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size);
+  void DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size, std::function<void()> callback);
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
   void SendToChannel(const Msg& msg) { action_channel_->Send(msg); }
   void Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
@@ -51,6 +51,7 @@ class IBVerbsCommNet final {
   std::unordered_set<uint32_t> busy_read_ids_;
   std::mutex busy_read_id_mtx_;
   std::unordered_map<uint32_t, Msg> read_queue_;
+  std::unordered_map<uint32_t, std::function<void()>> callback_queue_;
   IBVerbsPoller* poller_;
 };
 }  // namespace comm_network

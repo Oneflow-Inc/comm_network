@@ -140,10 +140,11 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
   CHECK_EQ(ibv_post_send(qp_, &wr, &bad_wr), 0);
 }
 
-void IBVerbsQP::WriteDone(WorkRequestId* wr_id, uint32_t imm_data) {
+void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, uint32_t imm_data) {
   uint32_t read_id = imm_data >> 8;
   uint8_t buffer_id = imm_data & (0xFF);
   helper_->AsyncRead(read_id, buffer_id);
+  PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }
 
