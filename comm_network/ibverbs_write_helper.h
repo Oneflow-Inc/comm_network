@@ -10,19 +10,23 @@ class IBVerbsWriteHelper final {
   ~IBVerbsWriteHelper();
   IBVerbsWriteHelper();
 
-  void AsyncWrite(const Msg& msg);
+  void AsyncWrite(const WorkRecord& record);
   void FreeBuffer(uint8_t buffer_id);
-  void LoopProcess();
-  void NotifyMeToWrite();
 
  private:
-  std::thread thread_;
-  bool thread_is_busy_;
-  std::queue<Msg>* pending_msg_queue_;
-  std::mutex pending_msg_queue_mtx_;
-  std::queue<Msg>* cur_msg_queue_;
+  bool InitWriteHandle();
+  bool RequestBuffer();
+  bool DoCurWrite();
+  void NotifyMeToWrite();
+  void WriteUntilQueueEmptyOrNoBuffer();
+  uint8_t buffer_id_;
+  std::queue<WorkRecord>* pending_record_queue_;
+  std::mutex pending_record_queue_mtx_;
+  std::queue<WorkRecord>* cur_record_queue_;
   std::queue<uint8_t> idle_buffer_queue_;
   std::mutex idle_buffer_queue_mtx_;
-  std::condition_variable idle_buffer_queue_cv_;
+  WorkRecord cur_record_;
+  bool (IBVerbsWriteHelper::*cur_write_handle_)();
 };
+
 }  // namespace comm_network

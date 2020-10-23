@@ -28,10 +28,11 @@ void IBVerbsPoller::PollCQ() {
           break;
         }
         case IBV_WC_RDMA_WRITE: {
+          qp->RDMAWriteDone(wr_id);
           break;
         }
         case IBV_WC_RECV_RDMA_WITH_IMM: {
-          qp->WriteDone(wr_id, wc.imm_data);
+          qp->RDMARecvDone(wr_id, wc.imm_data);
           break;
         }
         case IBV_WC_RECV: {

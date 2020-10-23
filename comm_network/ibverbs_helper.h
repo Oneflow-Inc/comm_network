@@ -10,7 +10,7 @@ class IBVerbsHelper final {
   IBVerbsHelper();
   ~IBVerbsHelper();
 
-  void AsyncWrite(const Msg& msg);
+  void AsyncWrite(const WorkRecord& record);
   void AsyncRead(uint32_t read_id, uint8_t buffer_id);
   void FreeBuffer(uint8_t buffer_id);
 

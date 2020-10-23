@@ -6,15 +6,15 @@ namespace comm_network {
 
 void IBVerbsReadHelper::AsyncRead(uint32_t read_id, uint8_t buffer_id) {
   // get work record using read_id
-  Msg cur_msg = Global<IBVerbsCommNet>::Get()->GetWorkRecord(read_id);
-  int64_t src_machine_id = cur_msg.work_record.machine_id;
+  WorkRecord cur_msg = Global<IBVerbsCommNet>::Get()->GetWorkRecord(read_id);
+  int64_t src_machine_id = cur_msg.machine_id;
   IBVerbsMemDesc* recv_mem_desc =
       Global<IBVerbsCommNet>::Get()->GetRecvMemDescForReceiver(src_machine_id, buffer_id);
   // register memory to normal memory
   ibv_sge cur_sge = recv_mem_desc->sge_vec().at(0);
-  size_t offset = cur_msg.work_record.offset;
-  void* dst_addr = reinterpret_cast<char*>(cur_msg.work_record.begin_addr) + offset;
-  size_t data_size = cur_msg.work_record.data_size;
+  size_t offset = cur_msg.offset;
+  void* dst_addr = reinterpret_cast<char*>(cur_msg.begin_addr) + offset;
+  size_t data_size = cur_msg.data_size;
   size_t transfer_size = std::min(data_size - offset, buffer_size);
   memcpy(dst_addr, reinterpret_cast<void*>(cur_sge.addr), transfer_size);
   Global<IBVerbsCommNet>::Get()->SetWorkRecordOffset(read_id, offset + transfer_size);

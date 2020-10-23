@@ -46,9 +46,10 @@ class IBVerbsQP final {
                         uint32_t imm_data);
   void PostSendRequest(const Msg& msg);
 
-  void WriteDone(WorkRequestId*, uint32_t imm_data);
+  void RDMARecvDone(WorkRequestId*, uint32_t imm_data);
   void SendDone(WorkRequestId*);
   void RecvDone(WorkRequestId*);
+  void RDMAWriteDone(WorkRequestId*);
 
  private:
   WorkRequestId* NewWorkRequestId();
