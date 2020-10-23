@@ -11,7 +11,7 @@ IBVerbsHelper::~IBVerbsHelper() {
   delete write_helper_;
 }
 
-void IBVerbsHelper::AsyncWrite(const Msg& msg) { write_helper_->AsyncWrite(msg); }
+void IBVerbsHelper::AsyncWrite(const WorkRecord& record) { write_helper_->AsyncWrite(record); }
 void IBVerbsHelper::AsyncRead(uint32_t read_id, uint8_t buffer_id) {
   read_helper_->AsyncRead(read_id, buffer_id);
 }

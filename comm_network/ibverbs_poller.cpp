@@ -28,6 +28,7 @@ void IBVerbsPoller::PollCQ() {
           break;
         }
         case IBV_WC_RDMA_WRITE: {
+          qp->RDMAWriteDone(wr_id);
           break;
         }
         case IBV_WC_RECV_RDMA_WITH_IMM: {

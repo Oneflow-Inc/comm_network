@@ -5,9 +5,7 @@ enum class MsgType {
   kDataIsReady = 0,
   kAllocateMemory,
   kPleaseWrite,
-  kWorkRecord,
-  kFreeBufferPair,
-  kReadDone
+  kFreeBufferPair
 };
 
 struct DataIsReady {
@@ -30,22 +28,9 @@ struct PleaseWrite {
   uint32_t read_id;
 };
 
-struct WorkRecord {
-  int64_t machine_id;
-  uint32_t id;
-  void* begin_addr;
-  size_t data_size;
-  size_t offset;
-};
-
 struct FreeBufferPair {
   int64_t src_machine_id;
   uint8_t buffer_id;
-};
-
-struct ReadDone {
-  void* begin_addr;
-  size_t data_size;
 };
 
 struct Msg {
@@ -54,10 +39,20 @@ struct Msg {
     DataIsReady data_is_ready;
     AllocateMemory allocate_memory;
     PleaseWrite please_write;
-    WorkRecord work_record;
     FreeBufferPair free_buffer_pair;
-    ReadDone read_done;
   };
+};
+
+struct WorkRecord {
+  uint32_t id;
+  int64_t machine_id;
+  void* begin_addr;
+  size_t data_size;
+  size_t offset;
+  std::function<void()> callback;
+  WorkRecord() {}
+  WorkRecord(uint32_t id, int64_t machine_id, void* begin_addr, size_t data_size, size_t offset, std::function<void()> callback = NULL) :
+    id(id), machine_id(machine_id), begin_addr(begin_addr), data_size(data_size), offset(offset), callback(std::move(callback)) {} 
 };
 
 }  // namespace comm_network

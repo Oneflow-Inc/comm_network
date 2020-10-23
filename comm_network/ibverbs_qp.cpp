@@ -141,10 +141,14 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
 }
 
 void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, uint32_t imm_data) {
-  uint32_t read_id = imm_data >> 8;
+  uint32_t read_id = (imm_data >> 8) & (0xFFFFFF);
   uint8_t buffer_id = imm_data & (0xFF);
   helper_->AsyncRead(read_id, buffer_id);
   PostRecvRequest(wr_id->msg_mr);
+  DeleteWorkRequestId(wr_id);
+}
+
+void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) {
   DeleteWorkRequestId(wr_id);
 }
 
@@ -174,14 +178,8 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
       size_t data_size = recv_msg.please_write.data_size;
       uint32_t read_id = recv_msg.please_write.read_id;
       // use write helper to write message
-      Msg msg;
-      msg.msg_type = MsgType::kWorkRecord;
-      msg.work_record.id = read_id;
-      msg.work_record.machine_id = dst_machine_id;
-      msg.work_record.offset = 0;
-      msg.work_record.begin_addr = src_addr;
-      msg.work_record.data_size = data_size;
-      helper_->AsyncWrite(msg);
+      WorkRecord record(read_id, dst_machine_id, src_addr, data_size, 0);
+      helper_->AsyncWrite(record);
       break;
     }
     case (MsgType::kFreeBufferPair): {

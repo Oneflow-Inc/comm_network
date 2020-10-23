@@ -21,8 +21,14 @@ class IBVerbsCommNet final {
 
   std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> GetSendRecvMemPairForSender(int64_t machine_id,
                                                                               uint8_t buffer_id);
-  Msg GetWorkRecord(uint32_t read_id) { return read_queue_[read_id]; }
-  void SetWorkRecordOffset(uint32_t read_id, size_t offset) { read_queue_[read_id].work_record.offset = offset; }
+  WorkRecord GetWorkRecord(uint32_t read_id) { 
+    CHECK(read_queue_.find(read_id) != read_queue_.end());
+    return read_queue_.at(read_id); 
+  }
+  void SetWorkRecordOffset(uint32_t read_id, size_t offset) { 
+    CHECK(read_queue_.find(read_id) != read_queue_.end());
+    read_queue_.at(read_id).offset = offset; 
+  }
   IBVerbsMemDesc* GetRecvMemDescForReceiver(int64_t machine_id, uint8_t buffer_id);
 
   void DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size, std::function<void()> callback);
@@ -50,8 +56,7 @@ class IBVerbsCommNet final {
   std::vector<std::unordered_map<std::string, IBVerbsMemDescProto>> mem_desc_list_;
   std::unordered_set<uint32_t> busy_read_ids_;
   std::mutex busy_read_id_mtx_;
-  std::unordered_map<uint32_t, Msg> read_queue_;
-  std::unordered_map<uint32_t, std::function<void()>> callback_queue_;
+  std::unordered_map<uint32_t, WorkRecord> read_queue_;
   IBVerbsPoller* poller_;
 };
 }  // namespace comm_network

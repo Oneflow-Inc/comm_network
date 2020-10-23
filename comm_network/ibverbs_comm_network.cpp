@@ -80,6 +80,7 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(a
 }
 
 IBVerbsCommNet::~IBVerbsCommNet() {
+  read_queue_.clear();
   for (IBVerbsQP* qp : qp_vec_) {
     if (qp) { delete qp; }
   }
@@ -109,15 +110,8 @@ void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_ad
   msg.please_write.read_id = read_id;
   qp_vec_.at(src_machine_id)->PostSendRequest(msg);
   // enqueue this new work record into read_queue
-  Msg record;
-  record.msg_type = MsgType::kWorkRecord;
-  record.work_record.id = read_id;
-  record.work_record.machine_id = src_machine_id;
-  record.work_record.offset = 0;
-  record.work_record.begin_addr = dst_addr;
-  record.work_record.data_size = data_size;
-  read_queue_[read_id] = record;
-  callback_queue_[read_id] = callback;
+  WorkRecord record(read_id, src_machine_id, dst_addr, data_size, 0, callback);
+  read_queue_.emplace(read_id, record);
 }
 
 uint32_t IBVerbsCommNet::AllocateReadId() {
@@ -132,6 +126,8 @@ uint32_t IBVerbsCommNet::AllocateReadId() {
     flag = (busy_read_ids_.find(read_id) == busy_read_ids_.end());
     if (flag) { busy_read_ids_.insert(read_id); }
   } while (!flag);
+  CHECK_GE(read_id, 0);
+  CHECK_LE(read_id, pow(2, 24) - 1);
   return read_id;
 }
 
@@ -169,18 +165,12 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
   cur_msg.free_buffer_pair.buffer_id = buffer_id;
   SendMsg(machine_id, cur_msg);
   if (last_piece) {
-    void* begin_addr = read_queue_[read_id].work_record.begin_addr;
-    size_t data_size = read_queue_[read_id].work_record.data_size;
-    auto cb = callback_queue_[read_id];
-    CHECK_EQ(read_queue_.erase(read_id), 1);
-    CHECK_EQ(callback_queue_.erase(read_id), 1);
-    FreeReadId(read_id);
+    auto read_iter = read_queue_.find(read_id); 
+    CHECK(read_iter != read_queue_.end());
+    std::function<void()> cb = read_iter->second.callback;
+    read_queue_.erase(read_iter);
     cb();
-    // Msg finish_msg;
-    // finish_msg.msg_type = MsgType::kReadDone;
-    // finish_msg.read_done.begin_addr = begin_addr;
-    // finish_msg.read_done.data_size = data_size;
-    // action_channel_->Send(finish_msg);
+    FreeReadId(read_id);
   }
 }
 
