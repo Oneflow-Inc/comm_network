@@ -29,4 +29,4 @@ class BlockingCounter final {
   int64_t cnt_val_;
 };
 
-}  
+}  // namespace comm_network

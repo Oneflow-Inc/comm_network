@@ -148,9 +148,7 @@ void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, uint32_t imm_data) {
   DeleteWorkRequestId(wr_id);
 }
 
-void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) {
-  DeleteWorkRequestId(wr_id);
-}
+void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) { DeleteWorkRequestId(wr_id); }
 
 void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
   {

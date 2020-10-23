@@ -165,7 +165,7 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
   cur_msg.free_buffer_pair.buffer_id = buffer_id;
   SendMsg(machine_id, cur_msg);
   if (last_piece) {
-    auto read_iter = read_queue_.find(read_id); 
+    auto read_iter = read_queue_.find(read_id);
     CHECK(read_iter != read_queue_.end());
     std::function<void()> cb = read_iter->second.callback;
     read_queue_.erase(read_iter);

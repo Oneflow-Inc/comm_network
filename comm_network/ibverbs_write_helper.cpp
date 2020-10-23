@@ -75,19 +75,17 @@ bool IBVerbsWriteHelper::DoCurWrite() {
   cur_record_.offset += transfer_size;
   uint32_t imm_data = cur_record_.id << 8;
   imm_data += buffer_id_;
-  Global<IBVerbsCommNet>::Get()->Normal2RegisterDone(
-      cur_record_.machine_id, send_mem_desc, recv_mem_desc_proto, imm_data);
+  Global<IBVerbsCommNet>::Get()->Normal2RegisterDone(cur_record_.machine_id, send_mem_desc,
+                                                     recv_mem_desc_proto, imm_data);
   if (cur_record_.offset < data_size) {
-    cur_write_handle_ = &IBVerbsWriteHelper::RequestBuffer;  
+    cur_write_handle_ = &IBVerbsWriteHelper::RequestBuffer;
   } else {
-    cur_write_handle_ = &IBVerbsWriteHelper::InitWriteHandle; 
+    cur_write_handle_ = &IBVerbsWriteHelper::InitWriteHandle;
   }
   return true;
 }
 
-void IBVerbsWriteHelper::NotifyMeToWrite() {
-  WriteUntilQueueEmptyOrNoBuffer();
-}
+void IBVerbsWriteHelper::NotifyMeToWrite() { WriteUntilQueueEmptyOrNoBuffer(); }
 
 void IBVerbsWriteHelper::WriteUntilQueueEmptyOrNoBuffer() {
   while ((this->*cur_write_handle_)()) {}

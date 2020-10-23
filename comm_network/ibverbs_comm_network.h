@@ -21,17 +21,18 @@ class IBVerbsCommNet final {
 
   std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> GetSendRecvMemPairForSender(int64_t machine_id,
                                                                               uint8_t buffer_id);
-  WorkRecord GetWorkRecord(uint32_t read_id) { 
+  WorkRecord GetWorkRecord(uint32_t read_id) {
     CHECK(read_queue_.find(read_id) != read_queue_.end());
-    return read_queue_.at(read_id); 
+    return read_queue_.at(read_id);
   }
-  void SetWorkRecordOffset(uint32_t read_id, size_t offset) { 
+  void SetWorkRecordOffset(uint32_t read_id, size_t offset) {
     CHECK(read_queue_.find(read_id) != read_queue_.end());
-    read_queue_.at(read_id).offset = offset; 
+    read_queue_.at(read_id).offset = offset;
   }
   IBVerbsMemDesc* GetRecvMemDescForReceiver(int64_t machine_id, uint8_t buffer_id);
 
-  void DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size, std::function<void()> callback);
+  void DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr, size_t data_size,
+              std::function<void()> callback);
   void SendMsg(int64_t dst_machine_id, const Msg& msg);
   void SendToChannel(const Msg& msg) { action_channel_->Send(msg); }
   void Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
