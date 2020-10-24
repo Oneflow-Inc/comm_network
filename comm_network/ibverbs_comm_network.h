@@ -22,10 +22,12 @@ class IBVerbsCommNet final {
   std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> GetSendRecvMemPairForSender(int64_t machine_id,
                                                                               uint8_t buffer_id);
   WorkRecord GetWorkRecord(uint32_t read_id) {
+    std::unique_lock<std::mutex> lock(read_queue_mtx_);
     CHECK(read_queue_.find(read_id) != read_queue_.end());
     return read_queue_.at(read_id);
   }
   void SetWorkRecordOffset(uint32_t read_id, size_t offset) {
+    std::unique_lock<std::mutex> lock(read_queue_mtx_);
     CHECK(read_queue_.find(read_id) != read_queue_.end());
     read_queue_.at(read_id).offset = offset;
   }
@@ -57,6 +59,7 @@ class IBVerbsCommNet final {
   std::vector<std::unordered_map<std::string, IBVerbsMemDescProto>> mem_desc_list_;
   std::unordered_set<uint32_t> busy_read_ids_;
   std::mutex busy_read_id_mtx_;
+  std::mutex read_queue_mtx_;
   std::unordered_map<uint32_t, WorkRecord> read_queue_;
   IBVerbsPoller* poller_;
 };

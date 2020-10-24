@@ -80,7 +80,7 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(a
 }
 
 IBVerbsCommNet::~IBVerbsCommNet() {
-  read_queue_.clear();
+  CHECK_EQ(read_queue_.size(), 0);
   for (IBVerbsQP* qp : qp_vec_) {
     if (qp) { delete qp; }
   }
@@ -111,7 +111,10 @@ void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_ad
   qp_vec_.at(src_machine_id)->PostSendRequest(msg);
   // enqueue this new work record into read_queue
   WorkRecord record(read_id, src_machine_id, dst_addr, data_size, 0, callback);
-  read_queue_.emplace(read_id, record);
+  {
+    std::unique_lock<std::mutex> lock(read_queue_mtx_);
+    read_queue_.emplace(read_id, record);
+  }
 }
 
 uint32_t IBVerbsCommNet::AllocateReadId() {
@@ -165,10 +168,14 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
   cur_msg.free_buffer_pair.buffer_id = buffer_id;
   SendMsg(machine_id, cur_msg);
   if (last_piece) {
-    auto read_iter = read_queue_.find(read_id);
-    CHECK(read_iter != read_queue_.end());
-    std::function<void()> cb = read_iter->second.callback;
-    read_queue_.erase(read_iter);
+    std::function<void()> cb;
+    {
+      std::unique_lock<std::mutex> lock(read_queue_mtx_);
+      auto read_iter = read_queue_.find(read_id);
+      CHECK(read_iter != read_queue_.end());
+      cb = read_iter->second.callback;
+      read_queue_.erase(read_iter);
+    }
     cb();
     FreeReadId(read_id);
   }
