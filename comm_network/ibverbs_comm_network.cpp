@@ -108,13 +108,13 @@ void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_ad
   msg.please_write.data_size = data_size;
   uint32_t read_id = AllocateReadId();
   msg.please_write.read_id = read_id;
-  qp_vec_.at(src_machine_id)->PostSendRequest(msg);
   // enqueue this new work record into read_queue
   WorkRecord record(read_id, src_machine_id, dst_addr, data_size, 0, callback);
   {
     std::unique_lock<std::mutex> lock(read_queue_mtx_);
     read_queue_.emplace(read_id, record);
   }
+  qp_vec_.at(src_machine_id)->PostSendRequest(msg);
 }
 
 uint32_t IBVerbsCommNet::AllocateReadId() {
