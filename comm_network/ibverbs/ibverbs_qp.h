@@ -1,7 +1,7 @@
 #pragma once
-#include "comm_network/ibverbs_memory_desc.h"
+#include "comm_network/ibverbs/ibverbs_memory_desc.h"
 #include "comm_network/message.h"
-#include "comm_network/ibverbs_helper.h"
+#include "comm_network/ibverbs/ibverbs_helper.h"
 
 namespace comm_network {
 class MsgMR final {

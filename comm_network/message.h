@@ -4,6 +4,7 @@ namespace comm_network {
 enum class MsgType { kDataIsReady = 0, kAllocateMemory, kPleaseWrite, kFreeBufferPair };
 
 struct DataIsReady {
+  uint32_t read_id;
   int64_t src_machine_id;
   int64_t dst_machine_id;
   void* src_addr;
@@ -11,6 +12,7 @@ struct DataIsReady {
 };
 
 struct AllocateMemory {
+  uint32_t read_id;
   int64_t src_machine_id;
   void* src_addr;
   size_t data_size;
@@ -24,6 +26,7 @@ struct PleaseWrite {
 };
 
 struct FreeBufferPair {
+  uint32_t read_id;
   int64_t src_machine_id;
   uint8_t buffer_id;
 };

@@ -1,6 +1,6 @@
-#include "comm_network/ibverbs_read_helper.h"
+#include "comm_network/ibverbs/ibverbs_read_helper.h"
 #include "comm_network/message.h"
-#include "comm_network/ibverbs_comm_network.h"
+#include "comm_network/ibverbs/ibverbs_comm_network.h"
 
 namespace comm_network {
 

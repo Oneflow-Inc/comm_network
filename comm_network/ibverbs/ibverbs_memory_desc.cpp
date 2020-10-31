@@ -1,4 +1,4 @@
-#include "comm_network/ibverbs_memory_desc.h"
+#include "comm_network/ibverbs/ibverbs_memory_desc.h"
 
 namespace comm_network {
 

@@ -1,5 +1,5 @@
-#include "comm_network/ibverbs_comm_network.h"
-#include "comm_network/ibverbs.pb.h"
+#include "comm_network/ibverbs/ibverbs_comm_network.h"
+#include "comm_network/ibverbs/ibverbs.pb.h"
 #include "comm_network/control/control.pb.h"
 
 namespace comm_network {
@@ -23,10 +23,8 @@ std::string GenRegisterRecvMemoryKey(int64_t src_machine_id, int64_t dst_machine
          + std::to_string(dst_machine_id) + "/" + std::to_string(idx);
 }
 
-IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(action_channel) {
-  int64_t total_machine_num = Global<EnvDesc>::Get()->TotalMachineNum();
-  this_machine_id_ =
-      Global<EnvDesc>::Get()->GetMachineId(Global<CtrlServer>::Get()->this_machine_addr());
+IBVerbsCommNet::IBVerbsCommNet() : CommNet() {
+	int64_t total_machine_num = Global<EnvDesc>::Get()->TotalMachineNum();
   mem_desc_list_.resize(total_machine_num);
   for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id_) { continue; }
@@ -77,9 +75,11 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(a
   }
   BARRIER();
   poller_->Start();
+  RegisterFixNumMemory();
 }
 
 IBVerbsCommNet::~IBVerbsCommNet() {
+  UnRegisterFixNumMemory();
   CHECK_EQ(read_queue_.size(), 0);
   for (IBVerbsQP* qp : qp_vec_) {
     if (qp) { delete qp; }
@@ -94,11 +94,17 @@ IBVerbsCommNet::~IBVerbsCommNet() {
   CHECK_EQ(ibv_close_device(context_), 0);
 }
 
-void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, const Msg& msg) {
+void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, Msg& msg,
+                             std::function<void()> callback) {
+  if (msg.msg_type == MsgType::kDataIsReady) {
+    uint32_t read_id = AllocateReadId();
+    msg.data_is_ready.read_id = read_id; 
+    AddUnfinishedDataReadyItem(msg, callback);
+  }
   qp_vec_.at(dst_machine_id)->PostSendRequest(msg);
 }
 
-void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_addr,
+void IBVerbsCommNet::DoRead(uint32_t read_id, int64_t src_machine_id, void* src_addr, void* dst_addr,
                             size_t data_size, std::function<void()> callback) {
   // send "PleaseWrite" message to sender machine
   Msg msg;
@@ -106,37 +112,14 @@ void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_ad
   msg.please_write.dst_machine_id = this_machine_id_;
   msg.please_write.src_addr = src_addr;
   msg.please_write.data_size = data_size;
-  uint32_t read_id = AllocateReadId();
   msg.please_write.read_id = read_id;
-  qp_vec_.at(src_machine_id)->PostSendRequest(msg);
   // enqueue this new work record into read_queue
   WorkRecord record(read_id, src_machine_id, dst_addr, data_size, 0, callback);
   {
     std::unique_lock<std::mutex> lock(read_queue_mtx_);
     read_queue_.emplace(read_id, record);
   }
-}
-
-uint32_t IBVerbsCommNet::AllocateReadId() {
-  // Generate a random number
-  std::mt19937 gen(NewRandomSeed());
-  std::uniform_int_distribution<uint32_t> read_id_distrib(0, pow(2, 24) - 1);
-  uint32_t read_id;
-  bool flag = false;
-  do {
-    read_id = read_id_distrib(gen);
-    std::unique_lock<std::mutex> lock(busy_read_id_mtx_);
-    flag = (busy_read_ids_.find(read_id) == busy_read_ids_.end());
-    if (flag) { busy_read_ids_.insert(read_id); }
-  } while (!flag);
-  CHECK_GE(read_id, 0);
-  CHECK_LE(read_id, pow(2, 24) - 1);
-  return read_id;
-}
-
-void IBVerbsCommNet::FreeReadId(uint32_t read_id) {
-  std::unique_lock<std::mutex> lock(busy_read_id_mtx_);
-  CHECK_EQ(busy_read_ids_.erase(read_id), 1);
+  qp_vec_.at(src_machine_id)->PostSendRequest(msg);
 }
 
 std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> IBVerbsCommNet::GetSendRecvMemPairForSender(
@@ -166,6 +149,10 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
   cur_msg.msg_type = MsgType::kFreeBufferPair;
   cur_msg.free_buffer_pair.src_machine_id = machine_id;
   cur_msg.free_buffer_pair.buffer_id = buffer_id;
+  cur_msg.free_buffer_pair.read_id = 0;
+  if (last_piece) {
+    cur_msg.free_buffer_pair.read_id = read_id;
+  }
   SendMsg(machine_id, cur_msg);
   if (last_piece) {
     std::function<void()> cb;
@@ -177,8 +164,20 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
       read_queue_.erase(read_iter);
     }
     cb();
-    FreeReadId(read_id);
   }
+}
+
+void IBVerbsCommNet::SendLargeDataDone(uint32_t read_id) {
+  std::function<void()> cb;
+  {
+    std::unique_lock<std::mutex> lock(callback_queue_mtx_);
+    auto cb_iter = callback_queue_.find(read_id);
+    CHECK(cb_iter != callback_queue_.end());
+    cb = cb_iter->second;
+    callback_queue_.erase(cb_iter);
+  }
+  cb();
+  FreeReadId(read_id);
 }
 
 void* IBVerbsCommNet::RegisterMemory(std::string key, void* ptr, size_t byte_size) {

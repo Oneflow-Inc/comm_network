@@ -1,5 +1,5 @@
-#include "comm_network/ibverbs_poller.h"
-#include "comm_network/ibverbs_qp.h"
+#include "comm_network/ibverbs/ibverbs_poller.h"
+#include "comm_network/ibverbs/ibverbs_qp.h"
 
 namespace comm_network {
 IBVerbsPoller::IBVerbsPoller(ibv_cq* cq) : poll_exit_flag_(ATOMIC_FLAG_INIT) { cq_ = cq; }

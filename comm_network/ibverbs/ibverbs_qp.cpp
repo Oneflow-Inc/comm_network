@@ -1,7 +1,7 @@
 #include <infiniband/verbs.h>
-#include "comm_network/ibverbs_qp.h"
+#include "comm_network/ibverbs/ibverbs_qp.h"
 #include "comm_network/message.h"
-#include "comm_network/ibverbs_comm_network.h"
+#include "comm_network/ibverbs/ibverbs_comm_network.h"
 
 namespace comm_network {
 IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv_cq,
@@ -164,10 +164,11 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
     case (MsgType::kDataIsReady): {
       Msg msg;
       msg.msg_type = MsgType::kAllocateMemory;
+      msg.allocate_memory.read_id = recv_msg.data_is_ready.read_id;
       msg.allocate_memory.data_size = recv_msg.data_is_ready.data_size;
       msg.allocate_memory.src_addr = recv_msg.data_is_ready.src_addr;
       msg.allocate_memory.src_machine_id = recv_msg.data_is_ready.src_machine_id;
-      Global<IBVerbsCommNet>::Get()->SendToChannel(msg);
+      Global<IBVerbsCommNet>::Get()->ExecuteCallBack(msg);
       break;
     }
     case (MsgType::kPleaseWrite): {
@@ -182,6 +183,10 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
     }
     case (MsgType::kFreeBufferPair): {
       uint8_t buffer_id = recv_msg.free_buffer_pair.buffer_id;
+      uint32_t read_id = recv_msg.free_buffer_pair.read_id;
+      if (read_id != 0) {
+        Global<IBVerbsCommNet>::Get()->SendLargeDataDone(read_id);
+      }
       helper_->FreeBuffer(buffer_id);
       break;
     }
