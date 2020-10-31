@@ -1,7 +1,7 @@
 #pragma once
 
 #include <infiniband/verbs.h>
-#include "comm_network/ibverbs.pb.h"
+#include "comm_network/ibverbs/ibverbs.pb.h"
 #include "comm_network/common/utils.h"
 
 namespace comm_network {

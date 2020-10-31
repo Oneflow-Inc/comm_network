@@ -1,5 +1,5 @@
-#include "comm_network/ibverbs_write_helper.h"
-#include "comm_network/ibverbs_comm_network.h"
+#include "comm_network/ibverbs/ibverbs_write_helper.h"
+#include "comm_network/ibverbs/ibverbs_comm_network.h"
 
 namespace comm_network {
 IBVerbsWriteHelper::IBVerbsWriteHelper() {
