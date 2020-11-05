@@ -39,4 +39,9 @@ IBVerbsMemDescProto IBVerbsMemDesc::ToProto() {
   return proto;
 }
 
+void IBVerbsMemDesc::ToProto(IBVerbsMemDescProto* proto) {
+  for (const ibv_sge& sge : sge_vec_) { proto->add_mem_ptr(sge.addr); }
+  for (ibv_mr* mr : mr_vec_) { proto->add_mr_rkey(mr->rkey); }
+}
+
 }  // namespace comm_network

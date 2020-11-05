@@ -4,8 +4,14 @@
 #include "comm_network/ibverbs_comm_network.h"
 
 namespace comm_network {
+
+std::string GenTokensMsgKey(int64_t src_machine_id, int dst_machine_id) {
+  return "IBVerbsTokensMsg/" + std::to_string(src_machine_id) + "/"
+         + std::to_string(dst_machine_id);
+}
+
 IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv_cq,
-                     IBVerbsHelper* helper) {
+                     int64_t this_machine_id, int64_t peer_machine_id) {
   // ctx_, pd_
   ctx_ = ctx;
   pd_ = pd;
@@ -33,16 +39,47 @@ IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv
   FOR_RANGE(size_t, i, 0, recv_msg_buf_.size()) { recv_msg_buf_.at(i) = new MsgMR(pd_); }
   // send_msg_buf_
   CHECK(send_msg_buf_.empty());
-  helper_ = helper;
+  this_machine_id_ = this_machine_id;
+  peer_machine_id_ = peer_machine_id;
+  // Allocate send/recv register memory
+  IBVerbsTokensMsg this_tokens_msg;
+  for (int i = 0; i < num_of_register_buffer / 2; i++) {
+    void* send_buffer = malloc(buffer_size);
+    IBVerbsMemDesc* send_mem_desc = new IBVerbsMemDesc(pd_, send_buffer, buffer_size);
+    void* recv_buffer = malloc(buffer_size);
+    IBVerbsMemDesc* recv_mem_desc = new IBVerbsMemDesc(pd_, recv_buffer, buffer_size); 
+    mem_desc_.emplace_back(send_mem_desc, recv_mem_desc);
+    IBVerbsMemDescProto* new_proto = this_tokens_msg.add_peer_recv_mem_desc();
+    recv_mem_desc->ToProto(new_proto);
+  }
+  // Notify other machines the address of register memory
+  // Only receive memory need to be send
+  Global<CtrlClient>::Get()->PushKV(GenTokensMsgKey(this_machine_id_, peer_machine_id_), this_tokens_msg);
+  // Receive other machines' receive register memory
+  IBVerbsTokensMsg peer_tokens_msg;
+  Global<CtrlClient>::Get()->PullKV(GenTokensMsgKey(peer_machine_id_, this_machine_id_), &peer_tokens_msg);
+  for (int i = 0; i < num_of_register_buffer / 2; i++) {
+    send_recv_mem_desc_.emplace_back(mem_desc_[i].first, peer_tokens_msg.peer_recv_mem_desc(i));
+  }
+  BARRIER();
+  Global<CtrlClient>::Get()->ClearKV(GenTokensMsgKey(this_machine_id_, peer_machine_id_));
+  BARRIER();
+  helper_ = new IBVerbsHelper(send_recv_mem_desc_);
 }
 
 IBVerbsQP::~IBVerbsQP() {
   CHECK_EQ(ibv_destroy_qp(qp_), 0);
+  delete helper_;
   while (send_msg_buf_.empty() == false) {
     delete send_msg_buf_.front();
     send_msg_buf_.pop();
   }
   for (MsgMR* msg_mr : recv_msg_buf_) { delete msg_mr; }
+  // Free send/recv register memory
+  for (auto mem_desc_item : mem_desc_) {
+    delete mem_desc_item.first;
+    delete mem_desc_item.second;
+  }
 }
 
 void IBVerbsQP::Connect(const IBVerbsConnectionInfo& peer_info) {
@@ -143,7 +180,8 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
 void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, uint32_t imm_data) {
   uint32_t read_id = (imm_data >> 8) & (0xFFFFFF);
   uint8_t buffer_id = imm_data & (0xFF);
-  helper_->AsyncRead(read_id, buffer_id);
+  IBVerbsMemDesc* recv_mem_desc = mem_desc_[buffer_id].second;
+  helper_->SyncRead(read_id, buffer_id, recv_mem_desc);
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }

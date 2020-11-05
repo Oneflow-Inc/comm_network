@@ -4,12 +4,10 @@
 
 namespace comm_network {
 
-void IBVerbsReadHelper::AsyncRead(uint32_t read_id, uint8_t buffer_id) {
+void IBVerbsReadHelper::SyncRead(uint32_t read_id, uint8_t buffer_id, IBVerbsMemDesc* recv_mem_desc) {
   // get work record using read_id
   WorkRecord cur_msg = Global<IBVerbsCommNet>::Get()->GetWorkRecord(read_id);
   int64_t src_machine_id = cur_msg.machine_id;
-  IBVerbsMemDesc* recv_mem_desc =
-      Global<IBVerbsCommNet>::Get()->GetRecvMemDescForReceiver(src_machine_id, buffer_id);
   // register memory to normal memory
   ibv_sge cur_sge = recv_mem_desc->sge_vec().at(0);
   size_t offset = cur_msg.offset;

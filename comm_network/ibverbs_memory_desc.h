@@ -15,6 +15,7 @@ class IBVerbsMemDesc final {
   const std::vector<ibv_sge>& sge_vec() const { return sge_vec_; }
 
   IBVerbsMemDescProto ToProto();
+  void ToProto(IBVerbsMemDescProto* proto);
 
  private:
   std::vector<ibv_sge> sge_vec_;

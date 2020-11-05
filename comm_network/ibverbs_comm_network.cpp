@@ -4,30 +4,14 @@
 
 namespace comm_network {
 
-std::string GenTokensMsgKey(int64_t src_machine_id, int dst_machine_id) {
-  return "IBVerbsTokensMsg/" + std::to_string(src_machine_id) + "/"
-         + std::to_string(dst_machine_id);
-}
-
 std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
   return "IBVerbsConnInfo/" + std::to_string(src_machine_id) + "/" + std::to_string(dst_machine_id);
-}
-
-std::string GenRegisterSendMemoryKey(int64_t src_machine_id, int64_t dst_machine_id, uint8_t idx) {
-  return "IBVerbsSendMemory/" + std::to_string(src_machine_id) + "/"
-         + std::to_string(dst_machine_id) + "/" + std::to_string(idx);
-}
-
-std::string GenRegisterRecvMemoryKey(int64_t src_machine_id, int64_t dst_machine_id, uint8_t idx) {
-  return "IBVerbsRecvMemory/" + std::to_string(src_machine_id) + "/"
-         + std::to_string(dst_machine_id) + "/" + std::to_string(idx);
 }
 
 IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(action_channel) {
   int64_t total_machine_num = Global<EnvDesc>::Get()->TotalMachineNum();
   this_machine_id_ =
       Global<EnvDesc>::Get()->GetMachineId(Global<CtrlServer>::Get()->this_machine_addr());
-  mem_desc_list_.resize(total_machine_num);
   for (int64_t i = 0; i < total_machine_num; ++i) {
     if (i == this_machine_id_) { continue; }
     peer_machine_id_.insert(i);
@@ -52,12 +36,9 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(a
   // poller : cq = 1 : 1, cq : qp : helper = 1 : peer_machines : peer_machines
   poller_ = new IBVerbsPoller(cq_);
   qp_vec_.assign(peer_machine_id_.size() + 1, nullptr);
-  helper_vec_.assign(peer_machine_id_.size() + 1, nullptr);
   for (int64_t peer_id : peer_machine_id()) {
-    IBVerbsHelper* cur_helper = new IBVerbsHelper;
-    IBVerbsQP* cur_qp = new IBVerbsQP(context_, pd_, cq_, cq_, cur_helper);
+    IBVerbsQP* cur_qp = new IBVerbsQP(context_, pd_, cq_, cq_, this_machine_id_, peer_id);
     qp_vec_.at(peer_id) = cur_qp;
-    helper_vec_.at(peer_id) = cur_helper;
     IBVerbsConnectionInfo conn_info;
     conn_info.set_lid(port_attr.lid);
     conn_info.set_qp_num(cur_qp->qp_num());
@@ -84,9 +65,6 @@ IBVerbsCommNet::~IBVerbsCommNet() {
   for (IBVerbsQP* qp : qp_vec_) {
     if (qp) { delete qp; }
   }
-  for (IBVerbsHelper* helper : helper_vec_) {
-    if (helper) { delete helper; }
-  }
   poller_->Stop();
   delete poller_;
   CHECK_EQ(ibv_destroy_cq(cq_), 0);
@@ -108,13 +86,13 @@ void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, void* dst_ad
   msg.please_write.data_size = data_size;
   uint32_t read_id = AllocateReadId();
   msg.please_write.read_id = read_id;
-  qp_vec_.at(src_machine_id)->PostSendRequest(msg);
   // enqueue this new work record into read_queue
   WorkRecord record(read_id, src_machine_id, dst_addr, data_size, 0, callback);
   {
     std::unique_lock<std::mutex> lock(read_queue_mtx_);
     read_queue_.emplace(read_id, record);
   }
+  qp_vec_.at(src_machine_id)->PostSendRequest(msg);
 }
 
 uint32_t IBVerbsCommNet::AllocateReadId() {
@@ -137,21 +115,6 @@ uint32_t IBVerbsCommNet::AllocateReadId() {
 void IBVerbsCommNet::FreeReadId(uint32_t read_id) {
   std::unique_lock<std::mutex> lock(busy_read_id_mtx_);
   CHECK_EQ(busy_read_ids_.erase(read_id), 1);
-}
-
-std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto> IBVerbsCommNet::GetSendRecvMemPairForSender(
-    int64_t machine_id, uint8_t buffer_id) {
-  std::string send_key = GenRegisterSendMemoryKey(this_machine_id_, machine_id, buffer_id);
-  std::string recv_key = GenRegisterRecvMemoryKey(this_machine_id_, machine_id, buffer_id);
-  IBVerbsMemDesc* send_mem_desc = mem_desc_[send_key];
-  IBVerbsMemDescProto recv_mem_desc_proto = mem_desc_list_[machine_id][recv_key];
-  return std::make_pair(send_mem_desc, recv_mem_desc_proto);
-}
-
-IBVerbsMemDesc* IBVerbsCommNet::GetRecvMemDescForReceiver(int64_t machine_id, uint8_t buffer_id) {
-  std::string recv_key = GenRegisterRecvMemoryKey(machine_id, this_machine_id_, buffer_id);
-  IBVerbsMemDesc* recv_mem_desc = mem_desc_[recv_key];
-  return recv_mem_desc;
 }
 
 void IBVerbsCommNet::Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
@@ -178,53 +141,6 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, uint8_t buffer_id, 
     }
     cb();
     FreeReadId(read_id);
-  }
-}
-
-void* IBVerbsCommNet::RegisterMemory(std::string key, void* ptr, size_t byte_size) {
-  IBVerbsMemDesc* mem_desc = new IBVerbsMemDesc(pd_, ptr, byte_size);
-  mem_desc_.emplace(key, mem_desc);
-  return mem_desc;
-}
-
-void IBVerbsCommNet::UnRegisterMemory(std::string key) {
-  IBVerbsMemDesc* mem_desc = mem_desc_[key];
-  delete mem_desc;
-  CHECK_EQ(mem_desc_.erase(key), 1);
-}
-
-void IBVerbsCommNet::RegisterFixNumMemory() {
-  for (int64_t peer_id : peer_machine_id()) {
-    IBVerbsTokensMsg this_tokens_msg;
-    for (int i = 0; i < num_of_register_buffer / 2; i++) {
-      std::string send_key = GenRegisterSendMemoryKey(this_machine_id_, peer_id, i);
-      std::string recv_key = GenRegisterRecvMemoryKey(peer_id, this_machine_id_, i);
-      void* send_buffer = malloc(buffer_size);
-      void* recv_buffer = malloc(buffer_size);
-      RegisterMemory(send_key, send_buffer, buffer_size);
-      RegisterMemory(recv_key, recv_buffer, buffer_size);
-      this_tokens_msg.mutable_mem_desc()->insert({send_key, mem_desc_[send_key]->ToProto()});
-      this_tokens_msg.mutable_mem_desc()->insert({recv_key, mem_desc_[recv_key]->ToProto()});
-    }
-    Global<CtrlClient>::Get()->PushKV(GenTokensMsgKey(this_machine_id_, peer_id), this_tokens_msg);
-  }
-  for (int64_t peer_id : peer_machine_id()) {
-    IBVerbsTokensMsg peer_tokens_msg;
-    Global<CtrlClient>::Get()->PullKV(GenTokensMsgKey(peer_id, this_machine_id_), &peer_tokens_msg);
-    for (const auto& pair : peer_tokens_msg.mem_desc()) {
-      mem_desc_list_.at(peer_id).emplace(pair.first, pair.second);
-    }
-  }
-  BARRIER();
-  for (int64_t peer_id : peer_machine_id()) {
-    Global<CtrlClient>::Get()->ClearKV(GenTokensMsgKey(this_machine_id_, peer_id));
-  }
-}
-
-void IBVerbsCommNet::UnRegisterFixNumMemory() {
-  while (!mem_desc_.empty()) {
-    auto iter = mem_desc_.begin();
-    UnRegisterMemory(iter->first);
   }
 }
 

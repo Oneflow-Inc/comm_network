@@ -2,7 +2,7 @@
 #include "comm_network/ibverbs_comm_network.h"
 
 namespace comm_network {
-IBVerbsWriteHelper::IBVerbsWriteHelper() {
+IBVerbsWriteHelper::IBVerbsWriteHelper(const std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>>& send_recv_pair) : send_recv_pair_(send_recv_pair) {
   cur_record_queue_ = new std::queue<WorkRecord>;
   pending_record_queue_ = new std::queue<WorkRecord>;
   for (int i = 0; i < num_of_register_buffer / 2; i++) { idle_buffer_queue_.push(i); }
@@ -61,8 +61,9 @@ void IBVerbsWriteHelper::FreeBuffer(uint8_t buffer_id) {
 
 bool IBVerbsWriteHelper::DoCurWrite() {
   // normal memory to register memory
-  auto mem_desc_pair = Global<IBVerbsCommNet>::Get()->GetSendRecvMemPairForSender(
-      cur_record_.machine_id, buffer_id_);
+  // auto mem_desc_pair = Global<IBVerbsCommNet>::Get()->GetSendRecvMemPairForSender(
+  //     cur_record_.machine_id, buffer_id_);
+  auto mem_desc_pair = send_recv_pair_[buffer_id_];
   IBVerbsMemDesc* send_mem_desc = mem_desc_pair.first;
   IBVerbsMemDescProto recv_mem_desc_proto = mem_desc_pair.second;
   ibv_sge cur_sge = send_mem_desc->sge_vec().at(0);

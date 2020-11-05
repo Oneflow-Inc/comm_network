@@ -14,6 +14,6 @@ message IBVerbsConnectionInfo {
 }
 
 message IBVerbsTokensMsg {
-	map<string, IBVerbsMemDescProto> mem_desc = 2;
+	repeated IBVerbsMemDescProto peer_recv_mem_desc = 1;
 }
 

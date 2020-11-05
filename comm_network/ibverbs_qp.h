@@ -35,7 +35,7 @@ class IBVerbsQP final {
  public:
   CN_DISALLOW_COPY_AND_MOVE(IBVerbsQP);
   IBVerbsQP() = delete;
-  IBVerbsQP(ibv_context*, ibv_pd*, ibv_cq* send_cq, ibv_cq* recv_cq, IBVerbsHelper* helper);
+  IBVerbsQP(ibv_context*, ibv_pd*, ibv_cq* send_cq, ibv_cq* recv_cq, int64_t this_machine_id, int64_t peer_machine_id);
   ~IBVerbsQP();
 
   uint32_t qp_num() const { return qp_->qp_num; }
@@ -65,5 +65,9 @@ class IBVerbsQP final {
   std::mutex send_msg_buf_mtx_;
   std::queue<MsgMR*> send_msg_buf_;
   IBVerbsHelper* helper_;
+  int64_t this_machine_id_;
+  int64_t peer_machine_id_;
+  std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDesc*>> mem_desc_;
+  std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>> send_recv_mem_desc_;
 };
 }  // namespace comm_network

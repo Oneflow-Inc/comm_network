@@ -12,7 +12,6 @@ IBVerbsCommNet* InitCommNet(const EnvProto& env_proto, Channel<Msg>* action_chan
   Global<CtrlServer>::New();
   Global<CtrlClient>::New();
   Global<IBVerbsCommNet>::New(action_channel);
-  Global<IBVerbsCommNet>::Get()->RegisterFixNumMemory();
   return Global<IBVerbsCommNet>::Get();
 }
 
@@ -20,7 +19,6 @@ void DestroyCommNet() {
   Global<EnvDesc>::Delete();
   Global<CtrlServer>::Delete();
   Global<CtrlClient>::Delete();
-  Global<IBVerbsCommNet>::Get()->UnRegisterFixNumMemory();
   Global<IBVerbsCommNet>::Delete();
 }
 

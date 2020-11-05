@@ -7,11 +7,11 @@ namespace comm_network {
 class IBVerbsHelper final {
  public:
   CN_DISALLOW_COPY_AND_MOVE(IBVerbsHelper);
-  IBVerbsHelper();
+  IBVerbsHelper(const std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>>& send_recv_pair);
   ~IBVerbsHelper();
 
   void AsyncWrite(const WorkRecord& record);
-  void AsyncRead(uint32_t read_id, uint8_t buffer_id);
+  void SyncRead(uint32_t read_id, uint8_t buffer_id, IBVerbsMemDesc* recv_mem_desc);
   void FreeBuffer(uint8_t buffer_id);
 
  private:
