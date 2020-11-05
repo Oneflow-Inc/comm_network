@@ -27,17 +27,25 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(a
   CHECK(pd_);
   ibv_device_attr device_attr;
   CHECK_EQ(ibv_query_device(context_, &device_attr), 0);
-  cq_ = ibv_create_cq(context_, device_attr.max_cqe, nullptr, nullptr, 0);
-  CHECK(cq_);
+  // create multiple completion queues and pollers
+  for (int i = 0; i < num_of_cq; i++) {
+    ibv_cq* cq = ibv_create_cq(context_, device_attr.max_cqe, nullptr, nullptr, 0);
+    CHECK(cq);
+    cq_vec_.emplace_back(cq); 
+    IBVerbsPoller* poller = new IBVerbsPoller(cq);
+    poller_vec_.emplace_back(poller);
+  }
   ibv_port_attr port_attr;
   CHECK_EQ(ibv_query_port(context_, 1, &port_attr), 0);
   ibv_gid gid;
   CHECK_EQ(ibv_query_gid(context_, 1, 0, &gid), 0);
-  // poller : cq = 1 : 1, cq : qp : helper = 1 : peer_machines : peer_machines
-  poller_ = new IBVerbsPoller(cq_);
   qp_vec_.assign(peer_machine_id_.size() + 1, nullptr);
+  size_t cq_idx = 0;
   for (int64_t peer_id : peer_machine_id()) {
-    IBVerbsQP* cur_qp = new IBVerbsQP(context_, pd_, cq_, cq_, this_machine_id_, peer_id);
+    // Balanced select cq for qp
+    ibv_cq* cur_cq = cq_vec_[cq_idx];
+    cq_idx = (cq_idx + 1) % cq_vec_.size();
+    IBVerbsQP* cur_qp = new IBVerbsQP(context_, pd_, cur_cq, cur_cq, this_machine_id_, peer_id);
     qp_vec_.at(peer_id) = cur_qp;
     IBVerbsConnectionInfo conn_info;
     conn_info.set_lid(port_attr.lid);
@@ -45,19 +53,27 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(a
     conn_info.set_subnet_prefix(gid.global.subnet_prefix);
     conn_info.set_interface_id(gid.global.interface_id);
     Global<CtrlClient>::Get()->PushKV(GenConnInfoKey(this_machine_id_, peer_id), conn_info);
+    cur_qp->PushRegisterMemoryKey();
   }
   for (int64_t peer_id : peer_machine_id()) {
     IBVerbsConnectionInfo conn_info;
     Global<CtrlClient>::Get()->PullKV(GenConnInfoKey(peer_id, this_machine_id_), &conn_info);
+    qp_vec_.at(peer_id)->PullRegisterMemoryKey();
     qp_vec_.at(peer_id)->Connect(conn_info);
   }
   BARRIER();
   for (int64_t peer_id : peer_machine_id()) {
     qp_vec_.at(peer_id)->PostAllRecvRequest();
     Global<CtrlClient>::Get()->ClearKV(GenConnInfoKey(this_machine_id_, peer_id));
+    qp_vec_.at(peer_id)->ClearRegisterMemoryKey();
   }
   BARRIER();
-  poller_->Start();
+  for (int64_t peer_id : peer_machine_id()) {
+    qp_vec_.at(peer_id)->CreateHelper();
+  }
+  for (IBVerbsPoller* poller : poller_vec_) {
+    poller->Start();
+  } 
 }
 
 IBVerbsCommNet::~IBVerbsCommNet() {
@@ -65,9 +81,15 @@ IBVerbsCommNet::~IBVerbsCommNet() {
   for (IBVerbsQP* qp : qp_vec_) {
     if (qp) { delete qp; }
   }
-  poller_->Stop();
-  delete poller_;
-  CHECK_EQ(ibv_destroy_cq(cq_), 0);
+  for (IBVerbsPoller* poller : poller_vec_) {
+    if (poller) { 
+      poller->Stop();
+      delete poller; 
+    }
+  }
+  for (ibv_cq* cq : cq_vec_) {
+    CHECK_EQ(ibv_destroy_cq(cq), 0);
+  }
   CHECK_EQ(ibv_dealloc_pd(pd_), 0);
   CHECK_EQ(ibv_close_device(context_), 0);
 }

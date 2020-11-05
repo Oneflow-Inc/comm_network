@@ -42,28 +42,40 @@ IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv
   this_machine_id_ = this_machine_id;
   peer_machine_id_ = peer_machine_id;
   // Allocate send/recv register memory
-  IBVerbsTokensMsg this_tokens_msg;
   for (int i = 0; i < num_of_register_buffer / 2; i++) {
     void* send_buffer = malloc(buffer_size);
     IBVerbsMemDesc* send_mem_desc = new IBVerbsMemDesc(pd_, send_buffer, buffer_size);
     void* recv_buffer = malloc(buffer_size);
     IBVerbsMemDesc* recv_mem_desc = new IBVerbsMemDesc(pd_, recv_buffer, buffer_size); 
     mem_desc_.emplace_back(send_mem_desc, recv_mem_desc);
-    IBVerbsMemDescProto* new_proto = this_tokens_msg.add_peer_recv_mem_desc();
-    recv_mem_desc->ToProto(new_proto);
   }
+}
+
+void IBVerbsQP::PushRegisterMemoryKey() {
   // Notify other machines the address of register memory
   // Only receive memory need to be send
+  IBVerbsTokensMsg this_tokens_msg;
+  for (int i = 0; i < num_of_register_buffer / 2; i++) {
+    IBVerbsMemDescProto* new_proto = this_tokens_msg.add_peer_recv_mem_desc();
+    mem_desc_[i].second->ToProto(new_proto);
+  }
   Global<CtrlClient>::Get()->PushKV(GenTokensMsgKey(this_machine_id_, peer_machine_id_), this_tokens_msg);
+}
+
+void IBVerbsQP::PullRegisterMemoryKey() {
   // Receive other machines' receive register memory
   IBVerbsTokensMsg peer_tokens_msg;
   Global<CtrlClient>::Get()->PullKV(GenTokensMsgKey(peer_machine_id_, this_machine_id_), &peer_tokens_msg);
   for (int i = 0; i < num_of_register_buffer / 2; i++) {
     send_recv_mem_desc_.emplace_back(mem_desc_[i].first, peer_tokens_msg.peer_recv_mem_desc(i));
   }
-  BARRIER();
+}
+
+void IBVerbsQP::ClearRegisterMemoryKey() {
   Global<CtrlClient>::Get()->ClearKV(GenTokensMsgKey(this_machine_id_, peer_machine_id_));
-  BARRIER();
+}
+
+void IBVerbsQP::CreateHelper() {
   helper_ = new IBVerbsHelper(send_recv_mem_desc_);
 }
 
