@@ -52,8 +52,7 @@ class IBVerbsQP final {
   void RDMAWriteDone(WorkRequestId*);
   void PushRegisterMemoryKey();
   void PullRegisterMemoryKey();
-  void ClearRegisterMemoryKey();
-  void CreateHelper();
+  void ClearKeyAndCreateHelper();
 
  private:
   WorkRequestId* NewWorkRequestId();

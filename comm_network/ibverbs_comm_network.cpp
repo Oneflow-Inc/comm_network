@@ -65,12 +65,9 @@ IBVerbsCommNet::IBVerbsCommNet(Channel<Msg>* action_channel) : action_channel_(a
   for (int64_t peer_id : peer_machine_id()) {
     qp_vec_.at(peer_id)->PostAllRecvRequest();
     Global<CtrlClient>::Get()->ClearKV(GenConnInfoKey(this_machine_id_, peer_id));
-    qp_vec_.at(peer_id)->ClearRegisterMemoryKey();
+    qp_vec_.at(peer_id)->ClearKeyAndCreateHelper();
   }
   BARRIER();
-  for (int64_t peer_id : peer_machine_id()) {
-    qp_vec_.at(peer_id)->CreateHelper();
-  }
   for (IBVerbsPoller* poller : poller_vec_) {
     poller->Start();
   } 

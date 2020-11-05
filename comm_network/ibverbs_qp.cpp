@@ -71,11 +71,8 @@ void IBVerbsQP::PullRegisterMemoryKey() {
   }
 }
 
-void IBVerbsQP::ClearRegisterMemoryKey() {
+void IBVerbsQP::ClearKeyAndCreateHelper() {
   Global<CtrlClient>::Get()->ClearKV(GenTokensMsgKey(this_machine_id_, peer_machine_id_));
-}
-
-void IBVerbsQP::CreateHelper() {
   helper_ = new IBVerbsHelper(send_recv_mem_desc_);
 }
 
