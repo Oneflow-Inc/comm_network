@@ -160,9 +160,8 @@ void TestCorrectness(int64_t this_machine_id, Channel<Msg>* action_channel,
   std::cout << "the latency is : " << duration_sec / 1000000.0
             << " s, the throughput is : " << (1.0 * total_bytes) / duration_sec << "MB/s.\n"
             << "Test for correctness. Done.\n\n";
-  for (int i = 0; i < test_num; i++) {
-    free(origin_ptr_list.at(i));
-  }
+  BARRIER();
+  for (int i = 0; i < test_num; i++) { free(origin_ptr_list.at(i)); }
 }
 
 int main(int argc, char* argv[]) {

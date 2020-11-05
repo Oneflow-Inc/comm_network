@@ -2,13 +2,14 @@
 #include "comm_network/common/utils.h"
 #include "comm_network/ibverbs_poller.h"
 #include "comm_network/message.h"
+#include "comm_network/ibverbs_memory_desc.h"
 
 namespace comm_network {
 class IBVerbsWriteHelper final {
  public:
   CN_DISALLOW_COPY_AND_MOVE(IBVerbsWriteHelper);
   ~IBVerbsWriteHelper();
-  IBVerbsWriteHelper();
+  IBVerbsWriteHelper(const std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>>& send_recv_pair);
 
   void AsyncWrite(const WorkRecord& record);
   void FreeBuffer(uint8_t buffer_id);
@@ -27,6 +28,7 @@ class IBVerbsWriteHelper final {
   std::mutex idle_buffer_queue_mtx_;
   WorkRecord cur_record_;
   bool (IBVerbsWriteHelper::*cur_write_handle_)();
+  std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>> send_recv_pair_;
 };
 
 }  // namespace comm_network
