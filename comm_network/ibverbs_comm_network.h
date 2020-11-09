@@ -44,13 +44,14 @@ class IBVerbsCommNet final {
   std::vector<IBVerbsQP*> qp_vec_;
   ibv_context* context_;
   ibv_pd* pd_;
-  ibv_cq* cq_;
+  std::vector<ibv_cq*> cq_vec_;
+  // ibv_cq* cq_;
   Channel<Msg>* action_channel_;
   int64_t this_machine_id_;
   std::unordered_set<uint32_t> busy_read_ids_;
   std::mutex busy_read_id_mtx_;
   std::mutex read_queue_mtx_;
   std::unordered_map<uint32_t, WorkRecord> read_queue_;
-  IBVerbsPoller* poller_;
+  std::vector<IBVerbsPoller*> poller_vec_;
 };
 }  // namespace comm_network

@@ -5,6 +5,7 @@
 namespace comm_network {
 const int num_of_register_buffer = 4;
 const size_t buffer_size = 4 * 1024 * 1024;
+const int num_of_cq = 4;
 
 class EnvDesc {
  public:
