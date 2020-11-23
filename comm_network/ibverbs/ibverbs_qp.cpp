@@ -1,24 +1,21 @@
-#include <infiniband/verbs.h>
-#include "comm_network/ibverbs_qp.h"
-#include "comm_network/message.h"
-#include "comm_network/ibverbs_comm_network.h"
+#include "comm_network/ibverbs/ibverbs_qp.h"
+#include "comm_network/ibverbs/ibverbs_comm_network.h"
+#include "comm_network/control/ctrl_client.h"
+#include "comm_network/control/ctrl_server.h"
 
 namespace comm_network {
-
 std::string GenTokensMsgKey(int64_t src_machine_id, int dst_machine_id) {
   return "IBVerbsTokensMsg/" + std::to_string(src_machine_id) + "/"
          + std::to_string(dst_machine_id);
 }
 
 IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv_cq,
-                     int64_t this_machine_id, int64_t peer_machine_id) {
-  // ctx_, pd_
-  ctx_ = ctx;
-  pd_ = pd;
-  // qp_
+                     int64_t this_machine_id, int64_t peer_machine_id)
+    : ctx_(ctx), pd_(pd) {
+  // Create qp
   ibv_device_attr device_attr;
   CHECK_EQ(ibv_query_device(ctx, &device_attr), 0);
-  uint32_t max_recv_wr = rdma_recv_msg_buf_byte / sizeof(Msg);
+  uint32_t max_recv_wr = Global<CommNetConfigDesc>::Get()->SgeBytes() / sizeof(Msg);
   max_recv_wr = std::min<uint32_t>(max_recv_wr, device_attr.max_qp_wr);
   ibv_qp_init_attr qp_init_attr;
   qp_init_attr.qp_context = nullptr;
@@ -34,19 +31,21 @@ IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv
   qp_init_attr.sq_sig_all = 1;
   qp_ = ibv_create_qp(pd, &qp_init_attr);
   CHECK(qp_);
-  // recv_msg_buf_
+  // Prepare recv_msg_buf_
   recv_msg_buf_.assign(max_recv_wr, nullptr);
   FOR_RANGE(size_t, i, 0, recv_msg_buf_.size()) { recv_msg_buf_.at(i) = new MsgMR(pd_); }
-  // send_msg_buf_
+  // Prepare send_msg_buf_
   CHECK(send_msg_buf_.empty());
   this_machine_id_ = this_machine_id;
   peer_machine_id_ = peer_machine_id;
   // Allocate send/recv register memory
-  for (int i = 0; i < num_of_register_buffer / 2; i++) {
+  int64_t register_buffer_num = Global<CommNetConfigDesc>::Get()->RegisterBufferNum();
+  size_t buffer_size = Global<CommNetConfigDesc>::Get()->PerRegisterBufferMBytes();
+  for (int i = 0; i < register_buffer_num / 2; i++) {
     void* send_buffer = malloc(buffer_size);
     IBVerbsMemDesc* send_mem_desc = new IBVerbsMemDesc(pd_, send_buffer, buffer_size);
     void* recv_buffer = malloc(buffer_size);
-    IBVerbsMemDesc* recv_mem_desc = new IBVerbsMemDesc(pd_, recv_buffer, buffer_size); 
+    IBVerbsMemDesc* recv_mem_desc = new IBVerbsMemDesc(pd_, recv_buffer, buffer_size);
     mem_desc_.emplace_back(send_mem_desc, recv_mem_desc);
   }
 }
@@ -55,18 +54,20 @@ void IBVerbsQP::PushRegisterMemoryKey() {
   // Notify other machines the address of register memory
   // Only receive memory need to be send
   IBVerbsTokensMsg this_tokens_msg;
-  for (int i = 0; i < num_of_register_buffer / 2; i++) {
+  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum() / 2; i++) {
     IBVerbsMemDescProto* new_proto = this_tokens_msg.add_peer_recv_mem_desc();
     mem_desc_[i].second->ToProto(new_proto);
   }
-  Global<CtrlClient>::Get()->PushKV(GenTokensMsgKey(this_machine_id_, peer_machine_id_), this_tokens_msg);
+  Global<CtrlClient>::Get()->PushKV(GenTokensMsgKey(this_machine_id_, peer_machine_id_),
+                                    this_tokens_msg);
 }
 
 void IBVerbsQP::PullRegisterMemoryKey() {
   // Receive other machines' receive register memory
   IBVerbsTokensMsg peer_tokens_msg;
-  Global<CtrlClient>::Get()->PullKV(GenTokensMsgKey(peer_machine_id_, this_machine_id_), &peer_tokens_msg);
-  for (int i = 0; i < num_of_register_buffer / 2; i++) {
+  Global<CtrlClient>::Get()->PullKV(GenTokensMsgKey(peer_machine_id_, this_machine_id_),
+                                    &peer_tokens_msg);
+  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum() / 2; i++) {
     send_recv_mem_desc_.emplace_back(mem_desc_[i].first, peer_tokens_msg.peer_recv_mem_desc(i));
   }
 }
@@ -148,11 +149,11 @@ void IBVerbsQP::PostAllRecvRequest() {
 }
 
 void IBVerbsQP::PostWriteRequest(const IBVerbsMemDescProto& remote_mem,
-                                 const IBVerbsMemDesc& local_mem, uint32_t imm_data) {
-  CHECK_EQ(remote_mem.mem_ptr_size(), local_mem.sge_vec().size());
+                                 const IBVerbsMemDesc& local_mem, int32_t buffer_id,
+                                 int32_t sge_num) {
   WorkRequestId* wr_id = NewWorkRequestId();
-  wr_id->outstanding_sge_cnt = local_mem.sge_vec().size();
-  FOR_RANGE(size_t, i, 0, local_mem.sge_vec().size()) {
+  wr_id->outstanding_sge_cnt = sge_num;
+  FOR_RANGE(size_t, i, 0, sge_num) {
     ibv_send_wr wr;
     wr.wr_id = reinterpret_cast<uint64_t>(wr_id);
     wr.next = nullptr;
@@ -160,7 +161,7 @@ void IBVerbsQP::PostWriteRequest(const IBVerbsMemDescProto& remote_mem,
     wr.num_sge = 1;
     wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
     wr.send_flags = 0;
-    wr.imm_data = imm_data;
+    wr.imm_data = buffer_id;
     wr.wr.rdma.remote_addr = remote_mem.mem_ptr(i);
     wr.wr.rdma.rkey = remote_mem.mr_rkey(i);
     ibv_send_wr* bad_wr = nullptr;
@@ -186,11 +187,11 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
   CHECK_EQ(ibv_post_send(qp_, &wr, &bad_wr), 0);
 }
 
-void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, uint32_t imm_data) {
-  uint32_t read_id = (imm_data >> 8) & (0xFFFFFF);
-  uint8_t buffer_id = imm_data & (0xFF);
+void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, int32_t imm_data) {
+  int32_t buffer_id = imm_data;
+  int32_t sge_num = wr_id->outstanding_sge_cnt;
   IBVerbsMemDesc* recv_mem_desc = mem_desc_[buffer_id].second;
-  helper_->SyncRead(read_id, buffer_id, recv_mem_desc);
+  helper_->SyncRead(sge_num, buffer_id, recv_mem_desc);
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }
@@ -198,6 +199,11 @@ void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, uint32_t imm_data) {
 void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) { DeleteWorkRequestId(wr_id); }
 
 void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
+  // Invoke callback function when the message is user-defined
+  if (wr_id->msg_mr->msg().msg_type == MsgType::kUserMsg) {
+    auto cb = Global<IBVerbsCommNet>::Get()->UserSendMsgCb();
+    // cb();
+  }
   {
     std::unique_lock<std::mutex> lck(send_msg_buf_mtx_);
     send_msg_buf_.push(wr_id->msg_mr);
@@ -208,27 +214,24 @@ void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
 void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
   Msg recv_msg = wr_id->msg_mr->msg();
   switch (recv_msg.msg_type) {
-    case (MsgType::kDataIsReady): {
-      Msg msg;
-      msg.msg_type = MsgType::kAllocateMemory;
-      msg.allocate_memory.data_size = recv_msg.data_is_ready.data_size;
-      msg.allocate_memory.src_addr = recv_msg.data_is_ready.src_addr;
-      msg.allocate_memory.src_machine_id = recv_msg.data_is_ready.src_machine_id;
-      Global<IBVerbsCommNet>::Get()->SendToChannel(msg);
+    case (MsgType::kUserMsg): {
+      // Find register handler
+      auto handler = Global<IBVerbsCommNet>::Get()->GetMsgHandler(recv_msg.user_msg.msg_type);
+      CHECK(handler);
+      handler(recv_msg.user_msg.ptr, recv_msg.user_msg.bytes);
       break;
     }
     case (MsgType::kPleaseWrite): {
-      int64_t dst_machine_id = recv_msg.please_write.dst_machine_id;
       void* src_addr = recv_msg.please_write.src_addr;
-      size_t data_size = recv_msg.please_write.data_size;
-      uint32_t read_id = recv_msg.please_write.read_id;
+      size_t bytes = recv_msg.please_write.bytes;
+      size_t src_machine_id = recv_msg.please_write.src_machine_id;
       // use write helper to write message
-      WorkRecord record(read_id, dst_machine_id, src_addr, data_size, 0);
+      WorkRecord record(src_machine_id, src_addr, bytes, 0);
       helper_->AsyncWrite(record);
       break;
     }
     case (MsgType::kFreeBufferPair): {
-      uint8_t buffer_id = recv_msg.free_buffer_pair.buffer_id;
+      int32_t buffer_id = recv_msg.free_buffer_pair.buffer_id;
       helper_->FreeBuffer(buffer_id);
       break;
     }

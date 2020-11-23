@@ -1,7 +1,7 @@
 #pragma once
-#include "comm_network/ibverbs_memory_desc.h"
+#include "comm_network/ibverbs/ibverbs_memory_desc.h"
 #include "comm_network/message.h"
-#include "comm_network/ibverbs_helper.h"
+#include "comm_network/ibverbs/ibverbs_helper.h"
 
 namespace comm_network {
 class MsgMR final {
@@ -9,6 +9,9 @@ class MsgMR final {
   CN_DISALLOW_COPY_AND_MOVE(MsgMR);
   MsgMR() = delete;
   MsgMR(ibv_pd* pd) {
+    // Previous check configuration
+    size_t sge_bytes = Global<CommNetConfigDesc>::Get()->SgeBytes();
+    CHECK_LE(sizeof(msg_), sge_bytes);
     mem_desc_.reset(new IBVerbsMemDesc(pd, &msg_, sizeof(msg_)));
     CHECK_EQ(mem_desc_->sge_vec().size(), 1);
   }
@@ -35,7 +38,8 @@ class IBVerbsQP final {
  public:
   CN_DISALLOW_COPY_AND_MOVE(IBVerbsQP);
   IBVerbsQP() = delete;
-  IBVerbsQP(ibv_context*, ibv_pd*, ibv_cq* send_cq, ibv_cq* recv_cq, int64_t this_machine_id, int64_t peer_machine_id);
+  IBVerbsQP(ibv_context*, ibv_pd*, ibv_cq* send_cq, ibv_cq* recv_cq, int64_t this_machine_id,
+            int64_t peer_machine_id);
   ~IBVerbsQP();
 
   uint32_t qp_num() const { return qp_->qp_num; }
@@ -43,10 +47,10 @@ class IBVerbsQP final {
   void PostAllRecvRequest();
 
   void PostWriteRequest(const IBVerbsMemDescProto& remote_mem, const IBVerbsMemDesc& local_mem,
-                        uint32_t imm_data);
+                        int32_t buffer_id, int32_t sge_num);
   void PostSendRequest(const Msg& msg);
 
-  void RDMARecvDone(WorkRequestId*, uint32_t imm_data);
+  void RDMARecvDone(WorkRequestId*, int32_t buffer_id);
   void SendDone(WorkRequestId*);
   void RecvDone(WorkRequestId*);
   void RDMAWriteDone(WorkRequestId*);

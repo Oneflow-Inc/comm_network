@@ -1,7 +1,6 @@
 # Get all the test files
 SET(TEST_SOURCES
 	test_comm_network.cpp
-  test_3_machines.cpp
 )
 
 foreach(test_file ${TEST_SOURCES})

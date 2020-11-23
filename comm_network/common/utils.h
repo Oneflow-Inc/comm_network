@@ -21,9 +21,6 @@
 #include "comm_network/common/cplusplus_14.h"
 
 namespace comm_network {
-const size_t rdma_recv_msg_buf_byte = 6 * 1024 * 1024;
-const size_t rdma_mem_block_byte = 8 * 1024 * 1024;
-const int rdma_mem_block_num = 2;
 
 #define CN_DISALLOW_COPY(ClassName)     \
   ClassName(const ClassName&) = delete; \

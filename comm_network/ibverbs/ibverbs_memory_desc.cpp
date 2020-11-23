@@ -1,15 +1,19 @@
-#include "comm_network/ibverbs_memory_desc.h"
+
+#include "comm_network/ibverbs/ibverbs_memory_desc.h"
+#include "comm_network/comm_network_config_desc.h"
 
 namespace comm_network {
 
 IBVerbsMemDesc::IBVerbsMemDesc(ibv_pd* pd, void* mem_ptr, size_t byte_size) {
   CHECK_GE(byte_size, 1);
-  size_t block_num = (byte_size - 1) / rdma_mem_block_byte + 1;
+  size_t sge_bytes = Global<CommNetConfigDesc>::Get()->SgeBytes();
+  size_t block_num = (byte_size - 1) / sge_bytes + 1;
+
   sge_vec_.reserve(block_num);
   mr_vec_.reserve(block_num);
   char* ch_mem_ptr = reinterpret_cast<char*>(mem_ptr);
   while (byte_size > 0) {
-    size_t cur_size = std::min<size_t>(byte_size, rdma_mem_block_byte);
+    size_t cur_size = std::min<size_t>(byte_size, sge_bytes);
     ibv_mr* cur_mr =
         ibv_reg_mr(pd, ch_mem_ptr, cur_size,
                    IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE | IBV_ACCESS_REMOTE_READ);

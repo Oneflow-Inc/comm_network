@@ -1,11 +1,16 @@
-#include "comm_network/ibverbs_write_helper.h"
-#include "comm_network/ibverbs_comm_network.h"
+#include "comm_network/ibverbs/ibverbs_write_helper.h"
+#include "comm_network/ibverbs/ibverbs_comm_network.h"
+#include "comm_network/comm_network_config_desc.h"
 
 namespace comm_network {
-IBVerbsWriteHelper::IBVerbsWriteHelper(const std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>>& send_recv_pair) : send_recv_pair_(send_recv_pair) {
+IBVerbsWriteHelper::IBVerbsWriteHelper(
+    const std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>>& send_recv_pair)
+    : send_recv_pair_(send_recv_pair) {
   cur_record_queue_ = new std::queue<WorkRecord>;
   pending_record_queue_ = new std::queue<WorkRecord>;
-  for (int i = 0; i < num_of_register_buffer / 2; i++) { idle_buffer_queue_.push(i); }
+  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum() / 2; i++) {
+    idle_buffer_queue_.push(i);
+  }
   cur_write_handle_ = &IBVerbsWriteHelper::InitWriteHandle;
 }
 
@@ -51,7 +56,7 @@ void IBVerbsWriteHelper::AsyncWrite(const WorkRecord& record) {
   if (need_send_reminder) { NotifyMeToWrite(); }
 }
 
-void IBVerbsWriteHelper::FreeBuffer(uint8_t buffer_id) {
+void IBVerbsWriteHelper::FreeBuffer(int32_t buffer_id) {
   {
     std::unique_lock<std::mutex> lock(idle_buffer_queue_mtx_);
     idle_buffer_queue_.push(buffer_id);
@@ -61,24 +66,29 @@ void IBVerbsWriteHelper::FreeBuffer(uint8_t buffer_id) {
 
 bool IBVerbsWriteHelper::DoCurWrite() {
   // normal memory to register memory
-  // auto mem_desc_pair = Global<IBVerbsCommNet>::Get()->GetSendRecvMemPairForSender(
-  //     cur_record_.machine_id, buffer_id_);
   auto mem_desc_pair = send_recv_pair_[buffer_id_];
   IBVerbsMemDesc* send_mem_desc = mem_desc_pair.first;
   IBVerbsMemDescProto recv_mem_desc_proto = mem_desc_pair.second;
-  ibv_sge cur_sge = send_mem_desc->sge_vec().at(0);
   void* begin_addr = cur_record_.begin_addr;
-  size_t data_size = cur_record_.data_size;
+  size_t bytes = cur_record_.bytes;
   size_t offset = cur_record_.offset;
-  size_t transfer_size = std::min(data_size - offset, buffer_size);
+  size_t transfer_bytes =
+      std::min(bytes - offset, Global<CommNetConfigDesc>::Get()->PerRegisterBufferMBytes());
   char* src_addr = reinterpret_cast<char*>(begin_addr) + offset;
-  memcpy(reinterpret_cast<void*>(cur_sge.addr), src_addr, transfer_size);
-  cur_record_.offset += transfer_size;
-  uint32_t imm_data = cur_record_.id << 8;
-  imm_data += buffer_id_;
+  size_t sge_bytes = Global<CommNetConfigDesc>::Get()->SgeBytes();
+  int32_t sge_num = (transfer_bytes - 1) / sge_bytes + 1;
+  sge_num = std::min(Global<CommNetConfigDesc>::Get()->SgeNum(), sge_num);
+  size_t transfer_record = 0;
+  for (int i = 0; i < sge_num; i++) {
+    ibv_sge cur_sge = send_mem_desc->sge_vec().at(i);
+    size_t temp_bytes = std::min(sge_bytes, transfer_bytes - transfer_record);
+    memcpy(reinterpret_cast<void*>(cur_sge.addr), src_addr, temp_bytes);
+    transfer_record += temp_bytes;
+  }
+  cur_record_.offset += transfer_bytes;
   Global<IBVerbsCommNet>::Get()->Normal2RegisterDone(cur_record_.machine_id, send_mem_desc,
-                                                     recv_mem_desc_proto, imm_data);
-  if (cur_record_.offset < data_size) {
+                                                     recv_mem_desc_proto, buffer_id_, sge_num);
+  if (cur_record_.offset < bytes) {
     cur_write_handle_ = &IBVerbsWriteHelper::RequestBuffer;
   } else {
     cur_write_handle_ = &IBVerbsWriteHelper::InitWriteHandle;

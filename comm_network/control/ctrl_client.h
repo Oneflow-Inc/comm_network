@@ -1,5 +1,4 @@
 #pragma once
-#include "comm_network/env_desc.h"
 #include "comm_network/common/utils.h"
 #include "comm_network/common/preprocessor.h"
 #include "comm_network/control/ctrl_service.h"
@@ -10,8 +9,9 @@ using PbMessage = google::protobuf::Message;
 #define FILE_LINE_STR __FILE__ ":" CN_PP_STRINGIZE(__LINE__)
 
 #define BARRIER_ALL() Global<CtrlClient>::Get()->Barrier(FILE_LINE_STR)
-#define BARRIER() \
-  Global<CtrlClient>::Get()->Barrier(FILE_LINE_STR, Global<EnvDesc>::Get()->TotalMachineNum())
+#define BARRIER()                                   \
+  Global<CtrlClient>::Get()->Barrier(FILE_LINE_STR, \
+                                     Global<CommNetConfigDesc>::Get()->TotalMachineNum())
 
 class CtrlClient {
  public:
