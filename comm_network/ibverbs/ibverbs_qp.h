@@ -4,26 +4,52 @@
 #include "comm_network/ibverbs/ibverbs_helper.h"
 
 namespace comm_network {
+
 class MsgMR final {
  public:
   CN_DISALLOW_COPY_AND_MOVE(MsgMR);
   MsgMR() = delete;
   MsgMR(ibv_pd* pd) {
-    // Previous check configuration
-    size_t sge_bytes = Global<CommNetConfigDesc>::Get()->SgeBytes();
-    CHECK_LE(sizeof(msg_), sge_bytes);
-    mem_desc_.reset(new IBVerbsMemDesc(pd, &msg_, sizeof(msg_)));
+    // Register memory, it's user's responsibility to configure a suitable maximum message bytes
+    size_t max_msg_bytes = Global<CommNetConfigDesc>::Get()->MaxMsgBytes();
+    ptr_ = (char*)malloc(max_msg_bytes);
+    memset(ptr_, 0, max_msg_bytes);
+    mem_desc_.reset(new IBVerbsMemDesc(pd, ptr_, max_msg_bytes));
     CHECK_EQ(mem_desc_->sge_vec().size(), 1);
   }
-  ~MsgMR() { mem_desc_.reset(); }
-
-  const Msg& msg() const { return msg_; }
-  void set_msg(const Msg& val) { msg_ = val; }
+  ~MsgMR() {
+    // No need to free(ptr_), due to the memory of ptr_ points to 
+    // now change to a register memory and managed by mem_desc
+    mem_desc_.reset();
+  }
   const IBVerbsMemDesc& mem_desc() const { return *mem_desc_; }
+  void set_msg(int32_t msg_type_key, const char* ptr, size_t bytes, std::function<void()> cb) {
+    // Check for overflow bytes for message
+    size_t max_msg_bytes = Global<CommNetConfigDesc>::Get()->MaxMsgBytes();
+    CHECK_LE(bytes, max_msg_bytes - sizeof(size_t));
+    memcpy(ptr_, &bytes, sizeof(size_t));
+    ptr_ += sizeof(size_t);
+    memcpy(ptr_, ptr, bytes);
+    msg_type_key_ = msg_type_key;
+    if (cb) {
+      cb_ = std::move(cb);
+    } else {
+      cb_ = NULL;
+    }
+  }
+  char* msg_ptr() { return ptr_ + sizeof(size_t); }
+  size_t msg_bytes() {
+    size_t bytes = *(reinterpret_cast<size_t*>(ptr_));
+    return bytes;
+  }
+  bool user_msg() const { return (msg_type_key_ >= static_cast<int32_t>(MsgType::kNumType)); }
+  std::function<void()> user_cb() const { return cb_; }
 
  private:
-  Msg msg_;
   std::unique_ptr<IBVerbsMemDesc> mem_desc_;
+  char* ptr_;
+  int32_t msg_type_key_;
+  std::function<void()> cb_;
 };
 
 class IBVerbsQP;
@@ -52,7 +78,7 @@ class IBVerbsQP final {
 
   void RDMARecvDone(WorkRequestId*, int32_t buffer_id);
   void SendDone(WorkRequestId*);
-  void RecvDone(WorkRequestId*);
+  void RecvDone(WorkRequestId*, int32_t msg_type_key);
   void RDMAWriteDone(WorkRequestId*);
   void PushRegisterMemoryKey();
   void PullRegisterMemoryKey();

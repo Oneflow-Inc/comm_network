@@ -170,8 +170,41 @@ void IBVerbsQP::PostWriteRequest(const IBVerbsMemDescProto& remote_mem,
 }
 
 void IBVerbsQP::PostSendRequest(const Msg& msg) {
+  int32_t msg_type_key = -1;
+  const char* ptr = msg.ptr();
+  size_t bytes = msg.bytes();
+  std::function<void()> cb = msg.cb();
+  switch (msg.msg_type()) {
+    case (MsgType::kUserMsg): {
+      const UserMsg* user_msg = reinterpret_cast<const UserMsg*>(ptr);
+      CHECK_EQ(bytes, sizeof(*user_msg));
+      msg_type_key =
+          static_cast<int32_t>(MsgType::kNumType) + static_cast<int32_t>(user_msg->msg_type);
+      ptr = user_msg->ptr;
+      bytes = user_msg->bytes;
+      break;
+    }
+    case (MsgType::kPleaseWrite): {
+      const PleaseWrite* please_write = reinterpret_cast<const PleaseWrite*>(ptr);
+      CHECK_EQ(bytes, sizeof(*please_write));
+      msg_type_key = static_cast<int32_t>(MsgType::kPleaseWrite);
+      break;
+    }
+    case (MsgType::kFreeBufferPair): {
+      const FreeBufferPair* free_buffer_pair = reinterpret_cast<const FreeBufferPair*>(ptr);
+      CHECK_EQ(bytes, sizeof(*free_buffer_pair));
+      msg_type_key = static_cast<int32_t>(MsgType::kFreeBufferPair);
+      break;
+    }
+    default: {
+      LOG(INFO) << "Unsupport send message type";
+      break;
+    }
+  }
+  CHECK(ptr);
+  CHECK_GT(bytes, 0);
   MsgMR* msg_mr = GetOneSendMsgMRFromBuf();
-  msg_mr->set_msg(msg);
+  msg_mr->set_msg(msg_type_key, ptr, bytes, cb);
   WorkRequestId* wr_id = NewWorkRequestId();
   wr_id->msg_mr = msg_mr;
   ibv_send_wr wr;
@@ -179,9 +212,9 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
   wr.next = nullptr;
   wr.sg_list = const_cast<ibv_sge*>(&(msg_mr->mem_desc().sge_vec().at(0)));
   wr.num_sge = 1;
-  wr.opcode = IBV_WR_SEND;
+  wr.opcode = IBV_WR_SEND_WITH_IMM;
   wr.send_flags = 0;
-  wr.imm_data = 0;
+  wr.imm_data = msg_type_key;
   memset(&(wr.wr), 0, sizeof(wr.wr));
   ibv_send_wr* bad_wr = nullptr;
   CHECK_EQ(ibv_post_send(qp_, &wr, &bad_wr), 0);
@@ -200,9 +233,10 @@ void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) { DeleteWorkRequestId(wr_id)
 
 void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
   // Invoke callback function when the message is user-defined
-  if (wr_id->msg_mr->msg().msg_type == MsgType::kUserMsg) {
-    auto cb = Global<IBVerbsCommNet>::Get()->UserSendMsgCb();
-    // cb();
+  if (wr_id->msg_mr->user_msg()) {
+    auto cb = wr_id->msg_mr->user_cb();
+    CHECK(cb);
+    cb();
   }
   {
     std::unique_lock<std::mutex> lck(send_msg_buf_mtx_);
@@ -211,34 +245,41 @@ void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
   DeleteWorkRequestId(wr_id);
 }
 
-void IBVerbsQP::RecvDone(WorkRequestId* wr_id) {
-  Msg recv_msg = wr_id->msg_mr->msg();
-  switch (recv_msg.msg_type) {
-    case (MsgType::kUserMsg): {
-      // Find register handler
-      auto handler = Global<IBVerbsCommNet>::Get()->GetMsgHandler(recv_msg.user_msg.msg_type);
-      CHECK(handler);
-      handler(recv_msg.user_msg.ptr, recv_msg.user_msg.bytes);
-      break;
+void IBVerbsQP::RecvDone(WorkRequestId* wr_id, int32_t msg_type_key) {
+  char* ptr = wr_id->msg_mr->msg_ptr();
+  size_t msg_bytes = wr_id->msg_mr->msg_bytes();
+  if (msg_type_key < static_cast<int32_t>(MsgType::kNumType)) {
+    MsgType msg_type = static_cast<MsgType>(msg_type_key);
+    switch (msg_type) {
+      case (MsgType::kPleaseWrite): {
+        PleaseWrite* please_write = reinterpret_cast<PleaseWrite*>(ptr);
+        CHECK_EQ(msg_bytes, sizeof(*please_write));
+        void* src_addr = please_write->src_addr;
+        size_t bytes = please_write->bytes;
+        size_t src_machine_id = please_write->src_machine_id;
+        // use write helper to write message
+        WorkRecord record(src_machine_id, src_addr, bytes, 0);
+        helper_->AsyncWrite(record);
+        break;
+      }
+      case (MsgType::kFreeBufferPair): {
+        FreeBufferPair* free_buffer_pair = reinterpret_cast<FreeBufferPair*>(ptr);
+        CHECK_EQ(msg_bytes, sizeof(*free_buffer_pair));
+        int32_t buffer_id = free_buffer_pair->buffer_id;
+        helper_->FreeBuffer(buffer_id);
+        break;
+      }
+      default: {
+        LOG(INFO) << "Unsupport receive message type";
+        break;
+      }
     }
-    case (MsgType::kPleaseWrite): {
-      void* src_addr = recv_msg.please_write.src_addr;
-      size_t bytes = recv_msg.please_write.bytes;
-      size_t src_machine_id = recv_msg.please_write.src_machine_id;
-      // use write helper to write message
-      WorkRecord record(src_machine_id, src_addr, bytes, 0);
-      helper_->AsyncWrite(record);
-      break;
-    }
-    case (MsgType::kFreeBufferPair): {
-      int32_t buffer_id = recv_msg.free_buffer_pair.buffer_id;
-      helper_->FreeBuffer(buffer_id);
-      break;
-    }
-    default: {
-      LOG(INFO) << "Unsupport receive message type";
-      break;
-    }
+  } else {
+    // user-defined message
+    int32_t user_msg_key = msg_type_key - static_cast<int32_t>(MsgType::kNumType);
+    auto handler = Global<IBVerbsCommNet>::Get()->GetMsgHandler(user_msg_key);
+    CHECK(handler);
+    handler(ptr, msg_bytes);
   }
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);

@@ -36,7 +36,7 @@ void IBVerbsPoller::PollCQ() {
           break;
         }
         case IBV_WC_RECV: {
-          qp->RecvDone(wr_id);
+          qp->RecvDone(wr_id, wc.imm_data);
           break;
         }
         default: {

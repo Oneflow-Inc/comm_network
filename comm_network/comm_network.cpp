@@ -1,12 +1,11 @@
 #include "comm_network/comm_network.h"
+#include "comm_network/comm_network_config_desc.h"
 #include "comm_network/control/ctrl_client.h"
 #include "comm_network/control/ctrl_server.h"
 #include "comm_network/epoll/epoll_comm_network.h"
 #include "comm_network/ibverbs/ibverbs_comm_network.h"
 
 namespace comm_network {
-// Set up CommNet environment, return the CommNet handler
-// to invoke variety methods.
 CommNet* SetUpCommNet(const CommNetConfig& comm_net_config) {
   Global<CommNetConfigDesc>::New(comm_net_config);
   Global<CtrlServer>::New();
@@ -34,21 +33,22 @@ void CommNet::Init() {
 }
 
 void CommNet::Finalize() {
-  TearDown();
   for (auto* poller : poller_vec_) {
     if (poller) {
       poller->Stop();
       delete poller;
     }
   }
+  TearDown();
 }
 
-void CommNet::RegisterMsgHandler(int64_t msg_type,
+void CommNet::RegisterMsgHandler(int32_t msg_type,
                                  std::function<void(const char* ptr, size_t bytes)> handler) {
   msg_handlers_.emplace(msg_type, std::move(handler));
+  BARRIER();
 }
 
-std::function<void(const char* ptr, size_t bytes)> CommNet::GetMsgHandler(int64_t msg_type) {
+std::function<void(const char* ptr, size_t bytes)> CommNet::GetMsgHandler(int32_t msg_type) {
   auto msg_handler_iter = msg_handlers_.find(msg_type);
   CHECK(msg_handler_iter != msg_handlers_.end());
   return msg_handler_iter->second;

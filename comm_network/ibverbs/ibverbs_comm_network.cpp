@@ -3,6 +3,8 @@
 #include "comm_network/ibverbs/ibverbs.pb.h"
 #include "comm_network/control/ctrl_client.h"
 #include "comm_network/control/ctrl_server.h"
+#include "comm_network/ibverbs/ibverbs_poller.h"
+#include "comm_network/comm_network_config_desc.h"
 
 namespace comm_network {
 std::string GenConnInfoKey(int64_t src_machine_id, int64_t dst_machine_id) {
@@ -21,7 +23,7 @@ void IBVerbsCommNet::SetUp() {
   CHECK(pd_);
   ibv_device_attr device_attr;
   CHECK_EQ(ibv_query_device(context_, &device_attr), 0);
-  // create multiple completion queues
+  // create multiple completion queues and pollers
   int64_t poller_num = Global<CommNetConfigDesc>::Get()->PollerNum();
   for (int i = 0; i < poller_num; i++) {
     ibv_cq* cq = ibv_create_cq(context_, device_attr.max_cqe, nullptr, nullptr, 0);
@@ -75,26 +77,19 @@ void IBVerbsCommNet::TearDown() {
   CHECK_EQ(ibv_close_device(context_), 0);
 }
 
-void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, int64_t msg_type, const char* ptr,
+void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, int32_t msg_type, const char* ptr,
                              size_t bytes, std::function<void()> cb) {
-  // Construct user message
-  {
-    std::unique_lock<std::mutex> lock(cb_queue_mtx_);
-    cb_queue_.push(std::move(cb));
-  }
+  // Construct user message including callback, the invoke time for callback
+  // is managed by inside qp itself.
   UserMsg user_msg = {msg_type, ptr, bytes};
-  Msg msg;
-  msg.msg_type = MsgType::kUserMsg;
-  msg.user_msg = user_msg;
+  Msg msg(user_msg, cb);
   qp_vec_.at(dst_machine_id)->PostSendRequest(msg);
 }
 
 void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, size_t bytes, void* dst_addr,
                             std::function<void()> cb) {
   PleaseWrite please_write = {src_machine_id, src_addr, bytes};
-  Msg msg;
-  msg.msg_type = MsgType::kPleaseWrite;
-  msg.please_write = please_write;
+  Msg msg(please_write);
   // enqueue this new work record into read_queue
   WorkRecord record(src_machine_id, dst_addr, bytes, 0, cb);
   {
@@ -114,9 +109,7 @@ void IBVerbsCommNet::Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc*
 
 void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, int32_t buffer_id, bool last_piece) {
   FreeBufferPair free_buffer_pair = {machine_id, buffer_id};
-  Msg msg;
-  msg.msg_type = MsgType::kPleaseWrite;
-  msg.free_buffer_pair = free_buffer_pair;
+  Msg msg(free_buffer_pair);
   qp_vec_.at(machine_id)->PostSendRequest(msg);
   if (last_piece) {
     read_queue_.front().cb();
@@ -127,11 +120,14 @@ void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, int32_t buffer_id, 
   }
 }
 
-std::function<void()> IBVerbsCommNet::UserSendMsgCb() {
-  std::unique_lock<std::mutex> lock(cb_queue_mtx_);
-  auto cb = cb_queue_.front();
-  cb_queue_.pop();
-  return cb;
+WorkRecord IBVerbsCommNet::GetWorkRecord() {
+  std::unique_lock<std::mutex> lock(read_queue_mtx_);
+  return read_queue_.front();
+}
+
+void IBVerbsCommNet::SetWorkRecordOffset(size_t offset) {
+  std::unique_lock<std::mutex> lock(read_queue_mtx_);
+  read_queue_.front().offset = offset;
 }
 
 }  // namespace comm_network

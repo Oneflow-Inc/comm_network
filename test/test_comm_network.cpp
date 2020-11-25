@@ -5,6 +5,7 @@ using namespace comm_network;
 
 // User defined message type, supplied by themselves,
 // user should guarantee the key of message type is unique.
+// For it is the key to identify different message.
 enum class UserDefineMsgType { kDataIsReady = 10 };
 
 // User defined specific message body
@@ -30,7 +31,7 @@ int main() {
   }
   comm_net_config.set_ctrl_port(ctrl_port);
   comm_net_config.set_use_rdma(true);
-  // There are also some other options can be user-defined...
+  // There are also some other options can be user-defined..., comm_network_config.proto for detail
   comm_net_config.set_poller_num(4);
   // Intialize comm_network environment.
   // Get the handler from comm_network library
@@ -39,44 +40,43 @@ int main() {
   comm_net->Init();
   int64_t this_machine_id = comm_net->ThisMachineId();
   // Allocate test-case memory
+  // Register message handler with implicit synchronize ensuring all the machines
+  // have register the specific callback handler.
   // Machine 0 (sender) responsible for sending "DataIsReady" message, notifying receiver
   // the required data is ready.
   // After the sending process finishes, sender will invoke the user-defined callback which
   // is the last parameter of "SendMsg" operation.
-  // Machine 1 (receiver) responsible for registering specify handler for "DataIsReady" message.
-  // As soon as machine 1 receive the "DataIsReady" message, it should invoke "DoRead" operation
-  // to read the data from sender.
-  // After the reading process finishes, receiver will invoke the user-defined callback which
-  // is the last parameter of "DoRead" operation.
-  BlockingCounter bc(1);
+  // As soon as Machine 1 (receiver) receiving the "DataIsReady" message, it should invoke "DoRead"
+  // operation to read the data from sender. After the reading process finishes, receiver will
+  // invoke the user-defined callback which is the last parameter of "DoRead" operation.
+  BlockingCounter bc(2);
   size_t bytes = 4 * 1024 * 1024;
   void* addr = malloc(bytes);
-  BlockingCounter handler(1);
-  comm_net->RegisterMsgHandler(static_cast<int64_t>(UserDefineMsgType::kDataIsReady),
-                               [comm_net, &bc](const char* ptr, size_t bytes) {
-                                 const DataIsReady* data_is_ready =
-                                     reinterpret_cast<const DataIsReady*>(ptr);
-                                 CHECK_EQ(bytes, sizeof(*data_is_ready));
-                                 void* dst_ptr = malloc(data_is_ready->bytes);
-                                 // comm_net->DoRead(data_is_ready->src_machine_id,
-                                 // data_is_ready->src_addr,
-                                 //                  data_is_ready->bytes, dst_ptr, [&bc]() {
-                                 //                    // Do nothing in this case...
-                                 //                    bc.Decrease();
-                                 //                  });
-                               });
-  handler.Decrease();
-  handler.WaitUntilCntEqualZero();
+  comm_net->RegisterMsgHandler(
+      static_cast<int32_t>(UserDefineMsgType::kDataIsReady),
+      [comm_net, &bc](const char* ptr, size_t bytes) {
+        const DataIsReady* data_is_ready = reinterpret_cast<const DataIsReady*>(ptr);
+        CHECK_EQ(bytes, sizeof(*data_is_ready));
+        void* dst_ptr = malloc(data_is_ready->bytes);
+        std::cout << "In data is ready callback" << std::endl;
+        // comm_net->DoRead(data_is_ready->src_machine_id, data_is_ready->src_addr,
+        //                  data_is_ready->bytes, dst_ptr, [&bc]() {
+        //                    // Do nothing in this case...
+        //                    bc.Decrease();
+        //                  });
+      });
   if (this_machine_id == 0) {
     DataIsReady* data_is_ready = new DataIsReady(1, bytes, addr);
-    comm_net->SendMsg(1, static_cast<int64_t>(UserDefineMsgType::kDataIsReady),
+    comm_net->SendMsg(1, static_cast<int32_t>(UserDefineMsgType::kDataIsReady),
                       reinterpret_cast<const char*>(data_is_ready), sizeof(*data_is_ready),
                       [&bc]() {
                         // Do nothing in this case...
+                        std::cout << "In send message callback" << std::endl;
                         bc.Decrease();
                       });
   }
   bc.WaitUntilCntEqualZero();
   comm_net->Finalize();
+  free(addr);
   return 0;
 }

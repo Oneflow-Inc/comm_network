@@ -22,6 +22,7 @@ class CommNetConfigDesc {
   size_t SgeBytes() const {
     return comm_net_config_.per_register_buffer_mbytes() * 1024 * 1024 / comm_net_config_.sge_num();
   }
+  size_t MaxMsgBytes() const { return comm_net_config_.max_msg_bytes(); }
 
  private:
   CommNetConfig comm_net_config_;
