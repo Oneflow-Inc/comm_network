@@ -5,11 +5,10 @@
 
 namespace comm_network {
 
-void IBVerbsReadHelper::SyncRead(int32_t sge_num, int32_t buffer_id,
+void IBVerbsReadHelper::SyncRead(int64_t src_machine_id, int32_t sge_num, int32_t buffer_id,
                                  IBVerbsMemDesc* recv_mem_desc) {
-  // get work record using read_id
-  WorkRecord cur_msg = Global<IBVerbsCommNet>::Get()->GetWorkRecord();
-  int64_t src_machine_id = cur_msg.machine_id;
+  // get work record
+  WorkRecord cur_msg = Global<IBVerbsCommNet>::Get()->GetWorkRecord(src_machine_id);
   // register memory to normal memory
   size_t offset = cur_msg.offset;
   void* dst_addr = reinterpret_cast<char*>(cur_msg.begin_addr) + offset;
@@ -24,7 +23,7 @@ void IBVerbsReadHelper::SyncRead(int32_t sge_num, int32_t buffer_id,
     memcpy(dst_addr, reinterpret_cast<void*>(cur_sge.addr), temp_bytes);
     transfer_record += temp_bytes;
   }
-  Global<IBVerbsCommNet>::Get()->SetWorkRecordOffset(offset + transfer_bytes);
+  Global<IBVerbsCommNet>::Get()->SetWorkRecordOffset(src_machine_id, offset + transfer_bytes);
   bool is_last = (offset + transfer_bytes < bytes) ? false : true;
   Global<IBVerbsCommNet>::Get()->Register2NormalDone(src_machine_id, buffer_id, is_last);
 }

@@ -52,6 +52,10 @@ int main() {
   BlockingCounter bc(2);
   size_t bytes = 4 * 1024 * 1024;
   void* addr = malloc(bytes);
+  int* data = reinterpret_cast<int*>(addr);
+  data[0] = 10567;
+  data[1543] = 7589;
+  data[5632] = 12456;
   comm_net->RegisterMsgHandler(
       static_cast<int32_t>(UserDefineMsgType::kDataIsReady),
       [comm_net, &bc](const char* ptr, size_t bytes) {
@@ -59,14 +63,17 @@ int main() {
         CHECK_EQ(bytes, sizeof(*data_is_ready));
         void* dst_ptr = malloc(data_is_ready->bytes);
         std::cout << "In data is ready callback" << std::endl;
-        // comm_net->DoRead(data_is_ready->src_machine_id, data_is_ready->src_addr,
-        //                  data_is_ready->bytes, dst_ptr, [&bc]() {
-        //                    // Do nothing in this case...
-        //                    bc.Decrease();
-        //                  });
+        comm_net->DoRead(data_is_ready->src_machine_id, data_is_ready->src_addr,
+                         data_is_ready->bytes, dst_ptr, [&bc, dst_ptr]() {
+                           // Do nothing in this case...
+                           std::cout << "In Do Read callback" << std::endl;
+                           int* data = reinterpret_cast<int*>(dst_ptr);
+                           std::cout << data[0] << " " << data[1543] << " " << data[5632] << std::endl;
+                           bc.Decrease();
+                         });
       });
   if (this_machine_id == 0) {
-    DataIsReady* data_is_ready = new DataIsReady(1, bytes, addr);
+    DataIsReady* data_is_ready = new DataIsReady(0, bytes, addr);
     comm_net->SendMsg(1, static_cast<int32_t>(UserDefineMsgType::kDataIsReady),
                       reinterpret_cast<const char*>(data_is_ready), sizeof(*data_is_ready),
                       [&bc]() {

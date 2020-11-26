@@ -18,15 +18,13 @@ class IBVerbsCommNet final : public CommNet {
                            IBVerbsMemDescProto recv_mem_desc_proto, int32_t buffer_id,
                            int32_t sge_num);
   void Register2NormalDone(int64_t machine_id, int32_t buffer_id, bool last_piece);
-  WorkRecord GetWorkRecord();
-  void SetWorkRecordOffset(size_t offset);
+  WorkRecord GetWorkRecord(int64_t machine_id);
+  void SetWorkRecordOffset(int64_t machine_id, size_t offset);
 
  private:
   std::vector<IBVerbsQP*> qp_vec_;
   ibv_context* context_;
   ibv_pd* pd_;
   std::vector<ibv_cq*> cq_vec_;
-  std::mutex read_queue_mtx_;
-  std::queue<WorkRecord> read_queue_;
 };
 }  // namespace comm_network

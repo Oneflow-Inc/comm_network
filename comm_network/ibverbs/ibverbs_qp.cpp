@@ -36,6 +36,7 @@ IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv
   FOR_RANGE(size_t, i, 0, recv_msg_buf_.size()) { recv_msg_buf_.at(i) = new MsgMR(pd_); }
   // Prepare send_msg_buf_
   CHECK(send_msg_buf_.empty());
+  CHECK(read_queue_.empty());
   this_machine_id_ = this_machine_id;
   peer_machine_id_ = peer_machine_id;
   // Allocate send/recv register memory
@@ -169,6 +170,16 @@ void IBVerbsQP::PostWriteRequest(const IBVerbsMemDescProto& remote_mem,
   }
 }
 
+void IBVerbsQP::DealWorkRecord(WorkRecord& record, void* src_addr) {
+  PleaseWrite please_write = {this_machine_id_, src_addr, record.bytes};
+  Msg msg(please_write);
+  {
+    std::unique_lock<std::mutex> lock(read_queue_mtx_);
+    read_queue_.push(record);
+  }
+  PostSendRequest(msg);
+}
+
 void IBVerbsQP::PostSendRequest(const Msg& msg) {
   int32_t msg_type_key = -1;
   const char* ptr = msg.ptr();
@@ -194,6 +205,17 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
       const FreeBufferPair* free_buffer_pair = reinterpret_cast<const FreeBufferPair*>(ptr);
       CHECK_EQ(bytes, sizeof(*free_buffer_pair));
       msg_type_key = static_cast<int32_t>(MsgType::kFreeBufferPair);
+      bool last_piece = free_buffer_pair->last_piece;
+      if (last_piece) {
+        WorkRecord record;
+        {
+          std::unique_lock<std::mutex> lock(read_queue_mtx_);
+          record = read_queue_.front();
+          read_queue_.pop();
+        }
+        CHECK(record.cb);
+        record.cb();
+      }
       break;
     }
     default: {
@@ -224,7 +246,7 @@ void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, int32_t imm_data) {
   int32_t buffer_id = imm_data;
   int32_t sge_num = wr_id->outstanding_sge_cnt;
   IBVerbsMemDesc* recv_mem_desc = mem_desc_[buffer_id].second;
-  helper_->SyncRead(sge_num, buffer_id, recv_mem_desc);
+  helper_->SyncRead(peer_machine_id_, sge_num, buffer_id, recv_mem_desc);
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }
@@ -317,4 +339,15 @@ void IBVerbsQP::DeleteWorkRequestId(WorkRequestId* wr_id) {
   CHECK_EQ(wr_id->qp, this);
   delete wr_id;
 }
+
+WorkRecord IBVerbsQP::GetWorkRecord() {
+  std::unique_lock<std::mutex> lock(read_queue_mtx_);
+  return read_queue_.front();
+}
+
+void IBVerbsQP::SetWorkRecordOffset(size_t offset) {
+  std::unique_lock<std::mutex> lock(read_queue_mtx_);
+  read_queue_.front().offset = offset;
+}
+
 }  // namespace comm_network

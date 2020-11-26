@@ -20,6 +20,7 @@ struct PleaseWrite {
 struct FreeBufferPair {
   int64_t src_machine_id;
   int32_t buffer_id;
+  bool last_piece;
 };
 
 class Msg {

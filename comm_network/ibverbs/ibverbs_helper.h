@@ -11,7 +11,8 @@ class IBVerbsHelper final {
   ~IBVerbsHelper();
 
   void AsyncWrite(const WorkRecord& record);
-  void SyncRead(int32_t sge_num, int32_t buffer_id, IBVerbsMemDesc* recv_mem_desc);
+  void SyncRead(int64_t machine_id, int32_t sge_num, int32_t buffer_id,
+                IBVerbsMemDesc* recv_mem_desc);
   void FreeBuffer(int32_t buffer_id);
 
  private:

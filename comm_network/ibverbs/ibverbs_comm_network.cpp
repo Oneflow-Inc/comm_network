@@ -88,16 +88,10 @@ void IBVerbsCommNet::SendMsg(int64_t dst_machine_id, int32_t msg_type, const cha
 
 void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, size_t bytes, void* dst_addr,
                             std::function<void()> cb) {
-  PleaseWrite please_write = {src_machine_id, src_addr, bytes};
-  Msg msg(please_write);
-  // enqueue this new work record into read_queue
+  // Create a new work record, the detail dealing with record
+  // is hidden behind qp.
   WorkRecord record(src_machine_id, dst_addr, bytes, 0, cb);
-  {
-    std::unique_lock<std::mutex> lock(read_queue_mtx_);
-    read_queue_.push(record);
-  }
-  // Send please_write message to sender, request for data
-  qp_vec_.at(src_machine_id)->PostSendRequest(msg);
+  qp_vec_.at(src_machine_id)->DealWorkRecord(record, src_addr);
 }
 
 void IBVerbsCommNet::Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
@@ -108,26 +102,17 @@ void IBVerbsCommNet::Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc*
 }
 
 void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, int32_t buffer_id, bool last_piece) {
-  FreeBufferPair free_buffer_pair = {machine_id, buffer_id};
+  FreeBufferPair free_buffer_pair = {machine_id, buffer_id, last_piece};
   Msg msg(free_buffer_pair);
   qp_vec_.at(machine_id)->PostSendRequest(msg);
-  if (last_piece) {
-    read_queue_.front().cb();
-    {
-      std::unique_lock<std::mutex> lock(read_queue_mtx_);
-      read_queue_.pop();
-    }
-  }
 }
 
-WorkRecord IBVerbsCommNet::GetWorkRecord() {
-  std::unique_lock<std::mutex> lock(read_queue_mtx_);
-  return read_queue_.front();
+WorkRecord IBVerbsCommNet::GetWorkRecord(int64_t machine_id) {
+  return qp_vec_.at(machine_id)->GetWorkRecord();
 }
 
-void IBVerbsCommNet::SetWorkRecordOffset(size_t offset) {
-  std::unique_lock<std::mutex> lock(read_queue_mtx_);
-  read_queue_.front().offset = offset;
+void IBVerbsCommNet::SetWorkRecordOffset(int64_t machine_id, size_t offset) {
+  qp_vec_.at(machine_id)->SetWorkRecordOffset(offset);
 }
 
 }  // namespace comm_network

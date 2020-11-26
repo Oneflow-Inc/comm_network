@@ -18,7 +18,7 @@ class MsgMR final {
     CHECK_EQ(mem_desc_->sge_vec().size(), 1);
   }
   ~MsgMR() {
-    // No need to free(ptr_), due to the memory of ptr_ points to 
+    // No need to free(ptr_), due to the memory of ptr_ points to
     // now change to a register memory and managed by mem_desc
     mem_desc_.reset();
   }
@@ -28,8 +28,7 @@ class MsgMR final {
     size_t max_msg_bytes = Global<CommNetConfigDesc>::Get()->MaxMsgBytes();
     CHECK_LE(bytes, max_msg_bytes - sizeof(size_t));
     memcpy(ptr_, &bytes, sizeof(size_t));
-    ptr_ += sizeof(size_t);
-    memcpy(ptr_, ptr, bytes);
+    memcpy(ptr_ + sizeof(size_t), ptr, bytes);
     msg_type_key_ = msg_type_key;
     if (cb) {
       cb_ = std::move(cb);
@@ -39,7 +38,8 @@ class MsgMR final {
   }
   char* msg_ptr() { return ptr_ + sizeof(size_t); }
   size_t msg_bytes() {
-    size_t bytes = *(reinterpret_cast<size_t*>(ptr_));
+    size_t bytes = 0;
+    memcpy(&bytes, ptr_, sizeof(size_t));
     return bytes;
   }
   bool user_msg() const { return (msg_type_key_ >= static_cast<int32_t>(MsgType::kNumType)); }
@@ -83,6 +83,9 @@ class IBVerbsQP final {
   void PushRegisterMemoryKey();
   void PullRegisterMemoryKey();
   void ClearKeyAndCreateHelper();
+  void DealWorkRecord(WorkRecord& record, void* src_addr);
+  WorkRecord GetWorkRecord();
+  void SetWorkRecordOffset(size_t offset);
 
  private:
   WorkRequestId* NewWorkRequestId();
@@ -102,5 +105,7 @@ class IBVerbsQP final {
   int64_t peer_machine_id_;
   std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDesc*>> mem_desc_;
   std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>> send_recv_mem_desc_;
+  std::mutex read_queue_mtx_;
+  std::queue<WorkRecord> read_queue_;
 };
 }  // namespace comm_network

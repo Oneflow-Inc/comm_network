@@ -13,8 +13,9 @@ IBVerbsHelper::~IBVerbsHelper() {
 }
 
 void IBVerbsHelper::AsyncWrite(const WorkRecord& record) { write_helper_->AsyncWrite(record); }
-void IBVerbsHelper::SyncRead(int32_t sge_num, int32_t buffer_id, IBVerbsMemDesc* recv_mem_desc) {
-  read_helper_->SyncRead(sge_num, buffer_id, recv_mem_desc);
+void IBVerbsHelper::SyncRead(int64_t machine_id, int32_t sge_num, int32_t buffer_id,
+                             IBVerbsMemDesc* recv_mem_desc) {
+  read_helper_->SyncRead(machine_id, sge_num, buffer_id, recv_mem_desc);
 }
 void IBVerbsHelper::FreeBuffer(int32_t buffer_id) { write_helper_->FreeBuffer(buffer_id); }
 }  // namespace comm_network
