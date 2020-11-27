@@ -8,7 +8,7 @@ IBVerbsWriteHelper::IBVerbsWriteHelper(
     : send_recv_pair_(send_recv_pair) {
   cur_record_queue_ = new std::queue<WorkRecord>;
   pending_record_queue_ = new std::queue<WorkRecord>;
-  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum() / 2; i++) {
+  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum(); i++) {
     idle_buffer_queue_.push(i);
   }
   cur_write_handle_ = &IBVerbsWriteHelper::InitWriteHandle;

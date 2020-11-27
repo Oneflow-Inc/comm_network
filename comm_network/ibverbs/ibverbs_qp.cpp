@@ -42,7 +42,7 @@ IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv
   // Allocate send/recv register memory
   int64_t register_buffer_num = Global<CommNetConfigDesc>::Get()->RegisterBufferNum();
   size_t buffer_size = Global<CommNetConfigDesc>::Get()->PerRegisterBufferMBytes() * 1024 * 1024;
-  for (int i = 0; i < register_buffer_num / 2; i++) {
+  for (int i = 0; i < register_buffer_num; i++) {
     void* send_buffer = malloc(buffer_size);
     IBVerbsMemDesc* send_mem_desc = new IBVerbsMemDesc(pd_, send_buffer, buffer_size);
     void* recv_buffer = malloc(buffer_size);
@@ -55,7 +55,7 @@ void IBVerbsQP::PushRegisterMemoryKey() {
   // Notify other machines the address of register memory
   // Only receive memory need to be send
   IBVerbsTokensMsg this_tokens_msg;
-  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum() / 2; i++) {
+  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum(); i++) {
     IBVerbsMemDescProto* new_proto = this_tokens_msg.add_peer_recv_mem_desc();
     mem_desc_[i].second->ToProto(new_proto);
   }
@@ -68,7 +68,7 @@ void IBVerbsQP::PullRegisterMemoryKey() {
   IBVerbsTokensMsg peer_tokens_msg;
   Global<CtrlClient>::Get()->PullKV(GenTokensMsgKey(peer_machine_id_, this_machine_id_),
                                     &peer_tokens_msg);
-  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum() / 2; i++) {
+  for (int i = 0; i < Global<CommNetConfigDesc>::Get()->RegisterBufferNum(); i++) {
     send_recv_mem_desc_.emplace_back(mem_desc_[i].first, peer_tokens_msg.peer_recv_mem_desc(i));
   }
 }
@@ -288,6 +288,16 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id, int32_t msg_type_key) {
         CHECK_EQ(msg_bytes, sizeof(*free_buffer_pair));
         int32_t buffer_id = free_buffer_pair->buffer_id;
         helper_->FreeBuffer(buffer_id);
+        if (free_buffer_pair->last_piece) {
+          std::function<void()> cb;
+          {
+            std::unique_lock<std::mutex> lock(read_done_cbs_mtx_);
+            cb = std::move(read_done_cbs_.front());
+            read_done_cbs_.pop();
+          }
+          CHECK(cb);
+          cb();
+        }
         break;
       }
       default: {
@@ -347,6 +357,11 @@ WorkRecord IBVerbsQP::GetWorkRecord() {
 void IBVerbsQP::SetWorkRecordOffset(size_t offset) {
   std::unique_lock<std::mutex> lock(read_queue_mtx_);
   read_queue_.front().offset = offset;
+}
+
+void IBVerbsQP::RegisterReadDoneCb(std::function<void()> cb) {
+  std::unique_lock<std::mutex> lock(read_done_cbs_mtx_);
+  read_done_cbs_.push(std::move(cb));
 }
 
 }  // namespace comm_network

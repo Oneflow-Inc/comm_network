@@ -86,6 +86,7 @@ class IBVerbsQP final {
   void DealWorkRecord(WorkRecord& record, void* src_addr);
   WorkRecord GetWorkRecord();
   void SetWorkRecordOffset(size_t offset);
+  void RegisterReadDoneCb(std::function<void()> cb);
 
  private:
   WorkRequestId* NewWorkRequestId();
@@ -107,5 +108,7 @@ class IBVerbsQP final {
   std::vector<std::pair<IBVerbsMemDesc*, IBVerbsMemDescProto>> send_recv_mem_desc_;
   std::mutex read_queue_mtx_;
   std::queue<WorkRecord> read_queue_;
+  std::mutex read_done_cbs_mtx_;
+  std::queue<std::function<void()>> read_done_cbs_;
 };
 }  // namespace comm_network

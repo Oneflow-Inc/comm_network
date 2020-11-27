@@ -96,6 +96,12 @@ void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, size_t bytes
   qp->DealWorkRecord(record, src_addr);
 }
 
+void IBVerbsCommNet::RegisterReadDoneCb(int64_t dst_machine_id, std::function<void()> cb) {
+  IBVerbsQP* qp = qp_vec_.at(dst_machine_id);
+  CHECK(qp);
+  qp->RegisterReadDoneCb(cb);
+}
+
 void IBVerbsCommNet::Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
                                          IBVerbsMemDescProto recv_mem_desc_proto, int32_t buffer_id,
                                          int32_t sge_num) {

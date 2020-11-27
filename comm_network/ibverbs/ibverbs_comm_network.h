@@ -14,6 +14,7 @@ class IBVerbsCommNet final : public CommNet {
                std::function<void()> cb = NULL);
   void DoRead(int64_t src_machine_id, void* src_addr, size_t bytes, void* dst_addr,
               std::function<void()> cb = NULL);
+  void RegisterReadDoneCb(int64_t dst_machine_id, std::function<void()> cb);
   void Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
                            IBVerbsMemDescProto recv_mem_desc_proto, int32_t buffer_id,
                            int32_t sge_num);

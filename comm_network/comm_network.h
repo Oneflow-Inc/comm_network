@@ -34,6 +34,7 @@ class CommNet {
                        std::function<void()> cb = NULL) = 0;
   virtual void DoRead(int64_t src_machine_id, void* src_addr, size_t bytes, void* dst_addr,
                       std::function<void()> cb = NULL) = 0;
+  virtual void RegisterReadDoneCb(int64_t dst_machine_id, std::function<void()> cb) = 0;
 
  protected:
   std::vector<GenericPoller*> poller_vec_;

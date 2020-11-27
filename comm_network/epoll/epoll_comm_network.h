@@ -10,6 +10,7 @@ class EpollCommNet final : public CommNet {
                std::function<void()> handler = NULL) {}
   void DoRead(int64_t src_machine_id, void* src_addr, size_t bytes, void* dst_addr,
               std::function<void()> handler = NULL) {}
+  void RegisterReadDoneCb(int64_t dst_machine_id, std::function<void()> handler) {}
   void SetUp() {}
   void TearDown() {}
 
