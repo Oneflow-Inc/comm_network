@@ -12,7 +12,7 @@ struct UserMsg {
 };
 
 struct PleaseWrite {
-  int64_t src_machine_id;
+  int64_t dst_machine_id;
   void* src_addr;
   size_t bytes;
 };

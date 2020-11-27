@@ -41,7 +41,7 @@ IBVerbsQP::IBVerbsQP(ibv_context* ctx, ibv_pd* pd, ibv_cq* send_cq, ibv_cq* recv
   peer_machine_id_ = peer_machine_id;
   // Allocate send/recv register memory
   int64_t register_buffer_num = Global<CommNetConfigDesc>::Get()->RegisterBufferNum();
-  size_t buffer_size = Global<CommNetConfigDesc>::Get()->PerRegisterBufferMBytes();
+  size_t buffer_size = Global<CommNetConfigDesc>::Get()->PerRegisterBufferMBytes() * 1024 * 1024;
   for (int i = 0; i < register_buffer_num / 2; i++) {
     void* send_buffer = malloc(buffer_size);
     IBVerbsMemDesc* send_mem_desc = new IBVerbsMemDesc(pd_, send_buffer, buffer_size);
@@ -244,9 +244,8 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
 
 void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, int32_t imm_data) {
   int32_t buffer_id = imm_data;
-  int32_t sge_num = wr_id->outstanding_sge_cnt;
   IBVerbsMemDesc* recv_mem_desc = mem_desc_[buffer_id].second;
-  helper_->SyncRead(peer_machine_id_, sge_num, buffer_id, recv_mem_desc);
+  helper_->SyncRead(peer_machine_id_, buffer_id, recv_mem_desc);
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }
@@ -278,9 +277,9 @@ void IBVerbsQP::RecvDone(WorkRequestId* wr_id, int32_t msg_type_key) {
         CHECK_EQ(msg_bytes, sizeof(*please_write));
         void* src_addr = please_write->src_addr;
         size_t bytes = please_write->bytes;
-        size_t src_machine_id = please_write->src_machine_id;
+        size_t dst_machine_id = please_write->dst_machine_id;
         // use write helper to write message
-        WorkRecord record(src_machine_id, src_addr, bytes, 0);
+        WorkRecord record(dst_machine_id, src_addr, bytes, 0);
         helper_->AsyncWrite(record);
         break;
       }

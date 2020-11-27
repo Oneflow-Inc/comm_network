@@ -91,28 +91,37 @@ void IBVerbsCommNet::DoRead(int64_t src_machine_id, void* src_addr, size_t bytes
   // Create a new work record, the detail dealing with record
   // is hidden behind qp.
   WorkRecord record(src_machine_id, dst_addr, bytes, 0, cb);
-  qp_vec_.at(src_machine_id)->DealWorkRecord(record, src_addr);
+  IBVerbsQP* qp = qp_vec_.at(src_machine_id);
+  CHECK(qp);
+  qp->DealWorkRecord(record, src_addr);
 }
 
 void IBVerbsCommNet::Normal2RegisterDone(int64_t dst_machine_id, IBVerbsMemDesc* send_mem_desc,
                                          IBVerbsMemDescProto recv_mem_desc_proto, int32_t buffer_id,
                                          int32_t sge_num) {
-  qp_vec_.at(dst_machine_id)
-      ->PostWriteRequest(recv_mem_desc_proto, *send_mem_desc, buffer_id, sge_num);
+  IBVerbsQP* qp = qp_vec_.at(dst_machine_id);
+  CHECK(qp);
+  qp->PostWriteRequest(recv_mem_desc_proto, *send_mem_desc, buffer_id, sge_num);
 }
 
 void IBVerbsCommNet::Register2NormalDone(int64_t machine_id, int32_t buffer_id, bool last_piece) {
   FreeBufferPair free_buffer_pair = {machine_id, buffer_id, last_piece};
   Msg msg(free_buffer_pair);
-  qp_vec_.at(machine_id)->PostSendRequest(msg);
+  IBVerbsQP* qp = qp_vec_.at(machine_id);
+  CHECK(qp);
+  qp->PostSendRequest(msg);
 }
 
 WorkRecord IBVerbsCommNet::GetWorkRecord(int64_t machine_id) {
-  return qp_vec_.at(machine_id)->GetWorkRecord();
+  IBVerbsQP* qp = qp_vec_.at(machine_id);
+  CHECK(qp);
+  return qp->GetWorkRecord();
 }
 
 void IBVerbsCommNet::SetWorkRecordOffset(int64_t machine_id, size_t offset) {
-  qp_vec_.at(machine_id)->SetWorkRecordOffset(offset);
+  IBVerbsQP* qp = qp_vec_.at(machine_id);
+  CHECK(qp);
+  qp->SetWorkRecordOffset(offset);
 }
 
 }  // namespace comm_network

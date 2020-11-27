@@ -54,8 +54,8 @@ int main() {
   void* addr = malloc(bytes);
   int* data = reinterpret_cast<int*>(addr);
   data[0] = 10567;
-  data[1543] = 7589;
-  data[5632] = 12456;
+  data[2432] = 43222;
+  data[65312] = 52788;
   comm_net->RegisterMsgHandler(
       static_cast<int32_t>(UserDefineMsgType::kDataIsReady),
       [comm_net, &bc](const char* ptr, size_t bytes) {
@@ -68,7 +68,8 @@ int main() {
                            // Do nothing in this case...
                            std::cout << "In Do Read callback" << std::endl;
                            int* data = reinterpret_cast<int*>(dst_ptr);
-                           std::cout << data[0] << " " << data[1543] << " " << data[5632] << std::endl;
+                           std::cout << data[0] << " " << data[2432] << " " << data[65312]
+                                     << std::endl;
                            bc.Decrease();
                          });
       });
