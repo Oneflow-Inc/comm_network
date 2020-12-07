@@ -2,6 +2,7 @@
 SET(TEST_SOURCES
 	test_comm_network.cpp
   test_throughput.cpp
+  test_correctness.cpp
 )
 
 foreach(test_file ${TEST_SOURCES})
