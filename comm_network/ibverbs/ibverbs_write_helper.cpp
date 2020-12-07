@@ -67,7 +67,6 @@ void IBVerbsWriteHelper::FreeBuffer(int32_t buffer_id) {
 bool IBVerbsWriteHelper::DoCurWrite() {
   // normal memory to register memory
   auto mem_desc_pair = send_recv_pair_[buffer_id_];
-  LOG(INFO) << buffer_id_;
   IBVerbsMemDesc* send_mem_desc = mem_desc_pair.first;
   IBVerbsMemDescProto recv_mem_desc_proto = mem_desc_pair.second;
   void* begin_addr = cur_record_.begin_addr;

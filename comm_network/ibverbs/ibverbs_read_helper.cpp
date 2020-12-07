@@ -13,7 +13,6 @@ void IBVerbsReadHelper::SyncRead(int64_t src_machine_id, int32_t buffer_id,
   size_t offset = cur_msg.offset;
   char* dst_addr = reinterpret_cast<char*>(cur_msg.begin_addr) + offset;
   size_t bytes = cur_msg.bytes;
-  LOG(INFO) << buffer_id << " " << offset << " " << bytes;
   size_t transfer_bytes = std::min(
       bytes - offset, Global<CommNetConfigDesc>::Get()->PerRegisterBufferMBytes() * 1024 * 1024);
   size_t transfer_record = 0;
