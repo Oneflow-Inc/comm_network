@@ -8,7 +8,6 @@ IBVerbsMemDesc::IBVerbsMemDesc(ibv_pd* pd, void* mem_ptr, size_t byte_size) {
   CHECK_GE(byte_size, 1);
   size_t sge_bytes = Global<CommNetConfigDesc>::Get()->SgeBytes();
   size_t block_num = (byte_size - 1) / sge_bytes + 1;
-
   sge_vec_.reserve(block_num);
   mr_vec_.reserve(block_num);
   char* ch_mem_ptr = reinterpret_cast<char*>(mem_ptr);

@@ -162,7 +162,11 @@ void IBVerbsQP::PostWriteRequest(const IBVerbsMemDescProto& remote_mem,
     wr.num_sge = 1;
     wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
     wr.send_flags = 0;
-    wr.imm_data = buffer_id;
+    if (i == sge_num - 1) {
+      wr.imm_data = buffer_id;
+    } else {
+      wr.imm_data = INT_MAX;
+    }
     wr.wr.rdma.remote_addr = remote_mem.mem_ptr(i);
     wr.wr.rdma.rkey = remote_mem.mr_rkey(i);
     ibv_send_wr* bad_wr = nullptr;
@@ -244,13 +248,20 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
 
 void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, int32_t imm_data) {
   int32_t buffer_id = imm_data;
-  IBVerbsMemDesc* recv_mem_desc = mem_desc_[buffer_id].second;
-  helper_->SyncRead(peer_machine_id_, buffer_id, recv_mem_desc);
+  if (buffer_id != INT_MAX) {
+    IBVerbsMemDesc* recv_mem_desc = mem_desc_[buffer_id].second;
+    helper_->SyncRead(peer_machine_id_, buffer_id, recv_mem_desc);
+  }
   PostRecvRequest(wr_id->msg_mr);
   DeleteWorkRequestId(wr_id);
 }
 
-void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) { DeleteWorkRequestId(wr_id); }
+void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) { 
+  wr_id->outstanding_sge_cnt -= 1;
+  if (wr_id->outstanding_sge_cnt == 0) {
+    DeleteWorkRequestId(wr_id);
+  }
+}
 
 void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
   // Invoke callback function when the message is user-defined

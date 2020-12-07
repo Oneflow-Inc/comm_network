@@ -33,6 +33,7 @@ int main() {
   comm_net_config.set_use_rdma(true);
   // There are also some other options can be user-defined..., comm_network_config.proto for detail
   comm_net_config.set_poller_num(4);
+  comm_net_config.set_sge_num(4);
   // Intialize comm_network environment.
   // Get the handler from comm_network library
   // Generalize base pointer points to subclass
