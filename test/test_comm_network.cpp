@@ -63,8 +63,8 @@ int main() {
                            // Do nothing in this case...
                            std::cout << "In Do Read callback" << std::endl;
                            int* data = reinterpret_cast<int*>(dst_ptr);
-                           std::cout << data[0] << " " << data[2432] << " " << data[65312] << " " << data[1024*1024+54236]
-                                     << std::endl;
+                           std::cout << data[0] << " " << data[2432] << " " << data[65312] << " "
+                                     << data[1024 * 1024 + 54236] << std::endl;
                            bc.Decrease();
                          });
       });
@@ -75,15 +75,14 @@ int main() {
     data[0] = 10567;
     data[2432] = 43222;
     data[65312] = 52788;
-    data[1024*1024+54236] = 52498;
+    data[1024 * 1024 + 54236] = 52498;
     DataIsReady* data_is_ready = new DataIsReady(0, bytes, addr);
     comm_net->SendMsg(1, static_cast<int32_t>(UserDefineMsgType::kDataIsReady),
-                      reinterpret_cast<const char*>(data_is_ready), sizeof(*data_is_ready),
-                      []() {
+                      reinterpret_cast<const char*>(data_is_ready), sizeof(*data_is_ready), []() {
                         // Do nothing in this case...
                         std::cout << "In send message callback" << std::endl;
                       });
-    comm_net->RegisterReadDoneCb(1, [&bc, addr](){
+    comm_net->RegisterReadDoneCb(1, [&bc, addr]() {
       bc.Decrease();
       free(addr);
     });

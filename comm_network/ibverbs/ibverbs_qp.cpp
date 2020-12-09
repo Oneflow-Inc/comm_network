@@ -217,8 +217,7 @@ void IBVerbsQP::PostSendRequest(const Msg& msg) {
           record = read_queue_.front();
           read_queue_.pop();
         }
-        CHECK(record.cb);
-        record.cb();
+        if (record.cb) { record.cb(); }
       }
       break;
     }
@@ -256,19 +255,16 @@ void IBVerbsQP::RDMARecvDone(WorkRequestId* wr_id, int32_t imm_data) {
   DeleteWorkRequestId(wr_id);
 }
 
-void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) { 
+void IBVerbsQP::RDMAWriteDone(WorkRequestId* wr_id) {
   wr_id->outstanding_sge_cnt -= 1;
-  if (wr_id->outstanding_sge_cnt == 0) {
-    DeleteWorkRequestId(wr_id);
-  }
+  if (wr_id->outstanding_sge_cnt == 0) { DeleteWorkRequestId(wr_id); }
 }
 
 void IBVerbsQP::SendDone(WorkRequestId* wr_id) {
   // Invoke callback function when the message is user-defined
   if (wr_id->msg_mr->user_msg()) {
     auto cb = wr_id->msg_mr->user_cb();
-    CHECK(cb);
-    cb();
+    if (cb) { cb(); }
   }
   {
     std::unique_lock<std::mutex> lck(send_msg_buf_mtx_);
