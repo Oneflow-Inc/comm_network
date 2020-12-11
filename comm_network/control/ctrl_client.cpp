@@ -1,5 +1,5 @@
 #include "comm_network/control/ctrl_client.h"
-#include "comm_network/env_desc.h"
+#include "comm_network/comm_network_config_desc.h"
 
 namespace comm_network {
 
@@ -40,7 +40,7 @@ CtrlClient::~CtrlClient() {
 }
 
 void CtrlClient::Barrier(const std::string& barrier_name) {
-  Barrier(barrier_name, Global<EnvDesc>::Get()->TotalMachineNum());
+  Barrier(barrier_name, Global<CommNetConfigDesc>::Get()->TotalMachineNum());
 }
 
 void CtrlClient::Barrier(const std::string& barrier_name, int32_t barrier_num) {
@@ -87,13 +87,13 @@ void CtrlClient::PullKV(const std::string& k, PbMessage* msg) {
 }
 
 CtrlClient::CtrlClient() {
-  stubs_.reserve(Global<EnvDesc>::Get()->TotalMachineNum());
+  stubs_.reserve(Global<CommNetConfigDesc>::Get()->TotalMachineNum());
   int32_t port = -1;
   std::string addr = "";
-  for (int64_t i = 0; i < Global<EnvDesc>::Get()->TotalMachineNum(); ++i) {
-    const Machine& mchn = Global<EnvDesc>::Get()->machine(i);
+  for (int64_t i = 0; i < Global<CommNetConfigDesc>::Get()->TotalMachineNum(); ++i) {
+    const Machine& mchn = Global<CommNetConfigDesc>::Get()->machine(i);
     port = (mchn.ctrl_port_agent() != -1) ? (mchn.ctrl_port_agent())
-                                          : Global<EnvDesc>::Get()->ctrl_port();
+                                          : Global<CommNetConfigDesc>::Get()->ctrl_port();
     addr = mchn.addr() + ":" + std::to_string(port);
     stubs_.push_back(CtrlService::NewStub(addr));
     LoadServer(mchn.addr(), stubs_[i].get());
@@ -111,7 +111,7 @@ CtrlClient::CtrlClient() {
       }
       for (size_t i = 0; i < stubs_.size(); ++i) {
         grpc::ClientContext client_ctx;
-        request.set_addr(Global<EnvDesc>::Get()->machine(i).addr());
+        request.set_addr(Global<CommNetConfigDesc>::Get()->machine(i).addr());
         GRPC_CHECK(stubs_[i]->CallMethod<CtrlMethod::kLoadServer>(&client_ctx, request, &response))
             << "Machine " << i << " lost";
       }
@@ -143,7 +143,8 @@ void CtrlClient::LoadServer(const std::string& server_addr, CtrlService::Stub* s
 }
 
 CtrlService::Stub* CtrlClient::GetResponsibleStub(const std::string& key) {
-  int64_t machine_id = (std::hash<std::string>{}(key)) % Global<EnvDesc>::Get()->TotalMachineNum();
+  int64_t machine_id =
+      (std::hash<std::string>{}(key)) % Global<CommNetConfigDesc>::Get()->TotalMachineNum();
   return stubs_[machine_id].get();
 }
 

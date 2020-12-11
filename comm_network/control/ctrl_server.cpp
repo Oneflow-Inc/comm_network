@@ -1,12 +1,12 @@
 #include <grpc++/alarm.h>
 #include "comm_network/control/ctrl_server.h"
-#include "comm_network/env_desc.h"
+#include "comm_network/comm_network_config_desc.h"
 
 namespace comm_network {
 
 CtrlServer::CtrlServer() : is_first_connect_(true), this_machine_addr_("") {
   Init();
-  int port = Global<EnvDesc>::Get()->ctrl_port();
+  int port = Global<CommNetConfigDesc>::Get()->ctrl_port();
   std::string server_address("0.0.0.0:" + std::to_string(port));
   grpc::ServerBuilder server_builder;
   server_builder.SetMaxMessageSize(INT_MAX);

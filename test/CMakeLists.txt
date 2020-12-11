@@ -1,7 +1,8 @@
 # Get all the test files
 SET(TEST_SOURCES
 	test_comm_network.cpp
-  test_3_machines.cpp
+  test_throughput.cpp
+  test_correctness.cpp
 )
 
 foreach(test_file ${TEST_SOURCES})

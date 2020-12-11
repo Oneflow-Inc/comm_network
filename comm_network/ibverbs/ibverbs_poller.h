@@ -1,12 +1,14 @@
 #pragma once
 #include <infiniband/verbs.h>
 #include "comm_network/common/utils.h"
-#include "comm_network/message.h"
+#include "comm_network/comm_network.h"
 
 namespace comm_network {
-class IBVerbsPoller {
+
+class IBVerbsPoller final : public GenericPoller {
  public:
   CN_DISALLOW_COPY_AND_MOVE(IBVerbsPoller);
+  IBVerbsPoller() = delete;
   IBVerbsPoller(ibv_cq* cq);
   ~IBVerbsPoller() = default;
   void Start();

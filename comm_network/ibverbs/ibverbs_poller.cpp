@@ -1,5 +1,5 @@
-#include "comm_network/ibverbs_poller.h"
-#include "comm_network/ibverbs_qp.h"
+#include "comm_network/ibverbs/ibverbs_poller.h"
+#include "comm_network/ibverbs/ibverbs_qp.h"
 
 namespace comm_network {
 IBVerbsPoller::IBVerbsPoller(ibv_cq* cq) : poll_exit_flag_(ATOMIC_FLAG_INIT) { cq_ = cq; }
@@ -36,7 +36,7 @@ void IBVerbsPoller::PollCQ() {
           break;
         }
         case IBV_WC_RECV: {
-          qp->RecvDone(wr_id);
+          qp->RecvDone(wr_id, wc.imm_data);
           break;
         }
         default: {

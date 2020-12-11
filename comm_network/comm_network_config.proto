@@ -1,0 +1,21 @@
+syntax = "proto2";
+package comm_network;
+
+message Machine {
+  required int64 id = 1;
+  required string addr = 2; // domain name or ip
+  optional int32 ctrl_port_agent = 3 [default = -1];
+  optional int32 data_port_agent = 4 [default = -1];
+}
+
+message CommNetConfig {
+  repeated Machine machine = 1;
+  required int32 ctrl_port = 2;
+  optional int32 data_port = 3 [default = -1];
+  optional bool use_rdma = 4 [default = false];
+  optional int64 poller_num = 5 [default = 1];
+  optional int64 register_buffer_num = 6 [default = 2];
+  optional uint64 per_register_buffer_mbytes = 7 [default = 4];
+  optional int32 sge_num = 8 [default = 1];
+  optional int32 max_msg_bytes = 9 [default = 1024];
+}
